@@ -63,13 +63,7 @@ export function FeeSlipModal({ isOpen, onClose, student, latestPayment = null })
           className="relative p-6 md:p-8 bg-slate-950 text-slate-100 overflow-hidden"
         >
           {/* Watermark Logo in Background */}
-          <div className="pointer-events-none select-none absolute inset-0 flex items-center justify-center opacity-[0.04] overflow-hidden z-0">
-            <img
-              src="/src/assets/logo.svg"
-              alt="Watermark"
-              className="w-80 h-80 object-contain grayscale"
-            />
-          </div>
+          <CollegeLogo watermark={true} className="opacity-[0.06]" />
 
           <div className="relative z-10 space-y-5">
             {/* Slip Header with Logo */}

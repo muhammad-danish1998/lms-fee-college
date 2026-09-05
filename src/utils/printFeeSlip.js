@@ -1,5 +1,23 @@
 import { formatCurrency, formatDate } from './feeCalculator';
 
+const collegeLogoSvg = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none" style="width:100%; height:100%; display:block;">
+  <circle cx="100" cy="100" r="94" stroke="#0d9488" stroke-width="4" stroke-dasharray="6 3" />
+  <circle cx="100" cy="100" r="86" fill="#0f172a" stroke="#14b8a6" stroke-width="3" />
+  <path d="M 40 100 C 35 125 50 155 75 168 C 65 155 58 135 60 115 Z" fill="#0d9488" opacity="0.8"/>
+  <path d="M 160 100 C 165 125 150 155 125 168 C 135 155 142 135 140 115 Z" fill="#0d9488" opacity="0.8"/>
+  <path d="M 60 60 L 140 60 C 140 110 100 145 100 145 C 100 145 60 110 60 60 Z" fill="#134e4a" stroke="#2dd4bf" stroke-width="2"/>
+  <path d="M 100 68 L 128 80 L 100 92 L 72 80 Z" fill="#fbbf24"/>
+  <polygon points="128,80 128,95 124,95 124,82" fill="#d97706"/>
+  <path d="M 85 86 C 85 96 115 96 115 86" fill="none" stroke="#f59e0b" stroke-width="2"/>
+  <path d="M 80 102 C 90 98 100 102 100 102 C 100 102 110 98 120 102 L 120 122 C 110 118 100 122 100 122 C 100 122 90 118 80 122 Z" fill="#f8fafc" stroke="#0f766e" stroke-width="1.5"/>
+  <line x1="100" y1="102" x2="100" y2="122" stroke="#0f766e" stroke-width="1.5"/>
+  <text x="100" y="162" text-anchor="middle" fill="#5eead4" font-family="'Segoe UI', sans-serif" font-weight="900" font-size="14" letter-spacing="2">JMT</text>
+  <text x="100" y="44" text-anchor="middle" fill="#99f6e4" font-family="'Segoe UI', sans-serif" font-weight="800" font-size="9" letter-spacing="1">PUBLIC HIGHER SECONDARY</text>
+  <text x="100" y="184" text-anchor="middle" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-weight="700" font-size="8" letter-spacing="1">SCHOOL &amp; COLLEGE</text>
+</svg>
+`;
+
 export function printFeeSlip({ student, latestPayment = null }) {
   if (!student) return;
 
@@ -40,6 +58,8 @@ export function printFeeSlip({ student, latestPayment = null }) {
       padding: 0;
       display: flex;
       justify-content: center;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     .slip-card {
       position: relative;
@@ -52,16 +72,17 @@ export function printFeeSlip({ student, latestPayment = null }) {
       overflow: hidden;
       page-break-inside: avoid;
     }
-    .watermark {
+    .watermark-container {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
       width: 320px;
       height: 320px;
-      opacity: 0.05;
+      opacity: 0.08;
       pointer-events: none;
       z-index: 1;
+      filter: grayscale(80%);
     }
     .content-layer {
       position: relative;
@@ -80,10 +101,10 @@ export function printFeeSlip({ student, latestPayment = null }) {
       align-items: center;
       gap: 14px;
     }
-    .logo {
+    .logo-container {
       width: 65px;
       height: 65px;
-      object-fit: contain;
+      flex-shrink: 0;
     }
     .college-title {
       font-size: 17px;
@@ -145,7 +166,7 @@ export function printFeeSlip({ student, latestPayment = null }) {
     .info-row {
       display: flex;
       justify-content: space-between;
-      border-bottom: 1px dashed #f1f5f9;
+      border-bottom: 1px dashed #e2e8f0;
       padding-bottom: 4px;
       margin-bottom: 4px;
     }
@@ -199,55 +220,75 @@ export function printFeeSlip({ student, latestPayment = null }) {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      border-radius: 8px;
       padding: 10px 14px;
-      margin-bottom: 16px;
-      font-size: 11.5px;
+      border-radius: 8px;
+      margin-bottom: 14px;
     }
     .status-paid {
-      background: #ecfdf5;
-      border: 1.5px solid #10b981;
-      color: #065f46;
+      background: #f0fdf4;
+      border: 1.5px solid #86efac;
+      color: #15803d;
     }
     .status-due {
       background: #fffbeb;
-      border: 1.5px solid #f59e0b;
-      color: #92400e;
+      border: 1.5px solid #fde68a;
+      color: #b45309;
+    }
+    .status-badge {
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .dues-text {
+      font-size: 13px;
+      font-weight: 800;
+      font-family: monospace;
     }
     .signatures {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 30px;
-      margin-top: 30px;
+      display: flex;
+      justify-content: space-between;
+      margin-top: 24px;
       padding-top: 10px;
     }
-    .sign-line {
-      border-top: 1px solid #94a3b8;
+    .sig-box {
       text-align: center;
-      padding-top: 6px;
-      font-size: 10.5px;
-      color: #334155;
-      font-weight: 600;
+      width: 180px;
     }
-    .footer-note {
+    .sig-line {
+      border-top: 1.5px dashed #64748b;
+      margin-bottom: 4px;
+    }
+    .sig-label {
+      font-size: 10px;
+      color: #475569;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .footer {
       text-align: center;
-      margin-top: 14px;
+      margin-top: 16px;
+      padding-top: 10px;
+      border-top: 1px solid #e2e8f0;
       font-size: 9.5px;
-      color: #94a3b8;
-      border-top: 1px solid #f1f5f9;
-      padding-top: 6px;
+      color: #64748b;
     }
   </style>
 </head>
 <body>
   <div class="slip-card">
-    <img src="/src/assets/logo.svg" class="watermark" alt="Watermark" />
+    <!-- Inline Background Watermark Logo -->
+    <div class="watermark-container">
+      ${collegeLogoSvg}
+    </div>
 
     <div class="content-layer">
       <!-- Header -->
       <div class="header">
         <div class="header-left">
-          <img src="/src/assets/logo.svg" class="logo" alt="Logo" />
+          <div class="logo-container">
+            ${collegeLogoSvg}
+          </div>
           <div>
             <div class="college-title">${collegeName}</div>
             <div class="college-meta">${collegeAddress}</div>
@@ -300,11 +341,11 @@ export function printFeeSlip({ student, latestPayment = null }) {
         <div>
           <div class="info-row">
             <span class="k">Admission Session:</span>
-            <span class="v">${student.admission_session}</span>
+            <span class="v" style="color: #0d9488;">${student.admission_session}</span>
           </div>
           <div class="info-row">
             <span class="k">Admission Type:</span>
-            <span class="v" style="color: #0f766e;">${student.admission_type}</span>
+            <span class="v">${student.admission_type}</span>
           </div>
           <div class="info-row">
             <span class="k">Program / Group:</span>
@@ -312,42 +353,42 @@ export function printFeeSlip({ student, latestPayment = null }) {
           </div>
           <div class="info-row">
             <span class="k">Academic Class:</span>
-            <span class="v" style="color: #0d9488; font-weight: 700;">${student.academic_class}</span>
+            <span class="v" style="font-weight: 700; color: #0d9488;">${student.academic_class}</span>
           </div>
         </div>
       </div>
 
-      <!-- Fee Ledger Table -->
+      <!-- Fee Breakdown Table -->
       <div class="table-container">
         <table>
           <thead>
             <tr>
-              <th>Fee Particulars Description</th>
+              <th>Description</th>
               <th class="text-right">Amount (PKR)</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td>Total Agreed Course / Admission Fee</td>
-              <td class="text-right font-bold">${formatCurrency(totalFee)}</td>
+              <td>Total Academic Tuition Fee</td>
+              <td class="text-right font-bold" style="font-family: monospace;">${formatCurrency(totalFee)}</td>
             </tr>
-            ${paidToday > 0 ? `
-            <tr style="color: #64748b;">
-              <td>Previous Payments Received</td>
-              <td class="text-right">${formatCurrency(previousPaid)}</td>
+            <tr>
+              <td>Previously Paid Fee</td>
+              <td class="text-right" style="font-family: monospace; color: #475569;">${formatCurrency(previousPaid)}</td>
             </tr>
-            <tr style="background: #f0fdfa; font-weight: 600; color: #0d9488;">
-              <td>Amount Paid Today (${formatDate(slipDate)})</td>
-              <td class="text-right font-bold">${formatCurrency(paidToday)}</td>
+            <tr style="background: #f0fdfa;">
+              <td style="font-weight: 700; color: #0f766e;">Paid Amount (Current Transaction)</td>
+              <td class="text-right font-bold" style="font-family: monospace; color: #0f766e; font-size: 12.5px;">${formatCurrency(paidToday)}</td>
             </tr>
-            ` : ''}
             <tr style="background: #f8fafc; font-weight: 700;">
-              <td>Cumulative Total Amount Paid</td>
-              <td class="text-right font-bold" style="color: #059669;">${formatCurrency(totalPaid)}</td>
+              <td>Total Paid Fee to Date</td>
+              <td class="text-right font-bold" style="font-family: monospace; color: #15803d;">${formatCurrency(totalPaid)}</td>
             </tr>
-            <tr style="background: #f8fafc; font-weight: 800; font-size: 12.5px;">
-              <td>Remaining Outstanding Fee Dues</td>
-              <td class="text-right font-bold" style="color: ${remainingDues > 0 ? '#b45309' : '#059669'};">
+            <tr style="background: ${remainingDues > 0 ? '#fffbeb' : '#f0fdf4'};">
+              <td style="font-weight: 800; font-size: 12px; color: ${remainingDues > 0 ? '#b45309' : '#15803d'};">
+                ${remainingDues > 0 ? 'Remaining Outstanding Dues' : 'Remaining Balance'}
+              </td>
+              <td class="text-right font-bold" style="font-family: monospace; font-size: 13px; color: ${remainingDues > 0 ? '#b45309' : '#15803d'};">
                 ${formatCurrency(remainingDues)}
               </td>
             </tr>
@@ -355,44 +396,38 @@ export function printFeeSlip({ student, latestPayment = null }) {
         </table>
       </div>
 
-      <!-- Status Banner -->
-      ${isPaidInFull ? `
-      <div class="status-card status-paid">
+      <!-- Payment Status Card -->
+      <div class="status-card ${isPaidInFull ? 'status-paid' : 'status-due'}">
         <div>
-          <strong style="font-size: 13px;">STATUS: PAID IN FULL</strong>
-          <div style="font-size: 10px; margin-top: 2px;">All tuition and course fees are settled. Thank you!</div>
-        </div>
-        <div style="font-weight: 800; font-size: 13px;">Rs. 0 DUES</div>
-      </div>
-      ` : `
-      <div class="status-card status-due">
-        <div>
-          <strong style="font-size: 13px;">STATUS: PAYMENT DUE</strong>
+          <span class="status-badge">${isPaidInFull ? 'PAID IN FULL' : 'PAYMENT DUE'}</span>
           <div style="font-size: 10px; margin-top: 2px;">
-            Next Due Date: <strong>${formatDate(student.next_payment_due_date)}</strong>
-            ${student.promised_amount ? ` (Promised: ${formatCurrency(student.promised_amount)})` : ''}
+            ${isPaidInFull 
+              ? 'All college admission fees are cleared. Thank you.' 
+              : student.next_payment_due_date 
+                ? 'Promised / Next Due Date: ' + formatDate(student.next_payment_due_date)
+                : 'Please clear the remaining fee dues before deadline.'}
           </div>
         </div>
-        <div style="font-weight: 800; font-size: 13px; color: #b91c1c;">
-          ${formatCurrency(remainingDues)}
+        <div class="dues-text">
+          ${isPaidInFull ? 'Balance: Rs. 0' : 'Dues: ' + formatCurrency(remainingDues)}
         </div>
       </div>
-      `}
 
-      <!-- Signatures -->
+      <!-- Dual Signatures -->
       <div class="signatures">
-        <div class="sign-line">
-          Student / Depositor Signature
+        <div class="sig-box">
+          <div class="sig-line"></div>
+          <span class="sig-label">Student / Depositor Signature</span>
         </div>
-        <div class="sign-line">
-          Accounts Officer / Authorized Signatory
-          <div style="font-size: 8.5px; color: #64748b; margin-top: 2px;">${collegeName}</div>
+        <div class="sig-box">
+          <div class="sig-line"></div>
+          <span class="sig-label">Authorized Accounts Officer</span>
         </div>
       </div>
 
-      <!-- Footer Note -->
-      <div class="footer-note">
-        This is an official computer-generated fee receipt. Valid without stamp when signed by authorized staff.
+      <!-- Footer -->
+      <div class="footer">
+        Computer Generated Official Receipt • ${collegeName} • System Verified
       </div>
     </div>
   </div>
@@ -400,7 +435,7 @@ export function printFeeSlip({ student, latestPayment = null }) {
 </html>
   `;
 
-  // Create an isolated hidden iframe for printing
+  // Create isolated iframe
   const iframe = document.createElement('iframe');
   iframe.style.position = 'fixed';
   iframe.style.right = '0';
@@ -415,12 +450,12 @@ export function printFeeSlip({ student, latestPayment = null }) {
   doc.write(htmlContent);
   doc.close();
 
-  // Trigger print once iframe resources are loaded
+  // Print once iframe finishes loading
+  iframe.contentWindow.focus();
   setTimeout(() => {
-    iframe.contentWindow.focus();
     iframe.contentWindow.print();
     setTimeout(() => {
       document.body.removeChild(iframe);
     }, 1000);
-  }, 300);
+  }, 350);
 }
