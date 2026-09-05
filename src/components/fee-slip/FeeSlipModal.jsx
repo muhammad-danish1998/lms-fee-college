@@ -225,6 +225,11 @@ export function FeeSlipModal({ isOpen, onClose, student, latestPayment = null })
                 <span className="text-[9px] text-slate-500 block mt-0.5">{collegeName}</span>
               </div>
             </div>
+
+            {/* Non-Refundable Policy Note */}
+            <div className="text-center text-[10px] font-bold text-rose-400 print-dark-text pt-2 tracking-wide">
+              Note: Fee once paid is strictly non-refundable and non-transferable.
+            </div>
           </div>
         </div>
 

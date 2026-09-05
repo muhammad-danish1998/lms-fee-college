@@ -428,6 +428,11 @@ export function printFeeSlip({ student, latestPayment = null }) {
         </div>
       </div>
 
+      <!-- Non-Refundable Policy Note -->
+      <div style="margin-top: 14px; text-align: center; font-size: 10px; font-weight: 700; color: #b91c1c; letter-spacing: 0.2px;">
+        Note: Fee once paid is strictly non-refundable and non-transferable.
+      </div>
+
       <!-- Footer -->
       <div class="footer">
         Computer Generated Official Receipt • ${collegeName} • System Verified
