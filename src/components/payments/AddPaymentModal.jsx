@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { X, CreditCard, DollarSign, Calendar, AlertCircle, Clock, CalendarClock } from 'lucide-react';
 import { addPayment } from '../../services/paymentService';
 import { resolveOrExtendCommitment } from '../../services/commitmentService';
@@ -25,14 +25,15 @@ export function AddPaymentModal({ isOpen, onClose, student, onPaymentAdded }) {
 
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isLockedRef = useRef(false);
 
-  const numAmount = Number(amount) || 0;
+  const numAmount = Math.round(Number(amount)) || 0;
   const duesAfterPayment = Math.max(0, remainingDues - numAmount);
 
   // Auto calculate default remaining promise when amount changes
   const handleAmountChange = (val) => {
     setAmount(val);
-    const entered = Number(val) || 0;
+    const entered = Math.round(Number(val)) || 0;
     const remaining = Math.max(0, remainingDues - entered);
     setNewPromisedAmount(remaining.toString());
 
@@ -47,6 +48,8 @@ export function AddPaymentModal({ isOpen, onClose, student, onPaymentAdded }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isLockedRef.current || isSubmitting) return;
+
     setError('');
 
     if (!numAmount || numAmount <= 0) {
@@ -61,6 +64,7 @@ export function AddPaymentModal({ isOpen, onClose, student, onPaymentAdded }) {
     }
 
     try {
+      isLockedRef.current = true;
       setIsSubmitting(true);
 
       // 1. Record payment transaction
@@ -77,7 +81,7 @@ export function AddPaymentModal({ isOpen, onClose, student, onPaymentAdded }) {
         studentId: student.id,
         paidAmount: numAmount,
         newExtendedDate: extendCommitment && duesAfterPayment > 0 ? newExtendedDate : null,
-        newPromisedAmount: extendCommitment && duesAfterPayment > 0 ? Number(newPromisedAmount) || duesAfterPayment : null,
+        newPromisedAmount: extendCommitment && duesAfterPayment > 0 ? (Math.round(Number(newPromisedAmount)) || duesAfterPayment) : null,
         extensionReason: extendCommitment ? extensionReason : ''
       });
 
@@ -88,6 +92,7 @@ export function AddPaymentModal({ isOpen, onClose, student, onPaymentAdded }) {
     } catch (err) {
       setError(err.message || 'Failed to record payment. Please try again.');
     } finally {
+      isLockedRef.current = false;
       setIsSubmitting(false);
     }
   };

@@ -18,6 +18,16 @@ const collegeLogoSvg = `
 </svg>
 `;
 
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 export function printFeeSlip({ student, latestPayment = null }) {
   if (!student) return;
 
@@ -32,18 +42,19 @@ export function printFeeSlip({ student, latestPayment = null }) {
 
   const paidToday = latestPayment ? Number(latestPayment.amount) : 0;
   const previousPaid = Math.max(0, totalPaid - paidToday);
-  const receiptNo = latestPayment?.receipt_no || `RCP-${student.id.slice(0, 6).toUpperCase()}`;
+  const rawReceiptNo = latestPayment?.receipt_no || `RCP-${student.id.slice(0, 6).toUpperCase()}`;
+  const receiptNo = escapeHtml(rawReceiptNo);
   const slipDate = latestPayment?.payment_date || new Date().toISOString().split('T')[0];
 
-  const cleanStudentName = (student.student_name || 'Student').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
-  const pdfTitle = `Fee_Slip_${cleanStudentName}_${receiptNo}`;
+  const cleanStudentName = escapeHtml((student.student_name || 'Student').trim().replace(/[^a-zA-Z0-9_-]/g, '_'));
+  const pdfTitle = `Fee_Slip_${cleanStudentName}_${rawReceiptNo}`;
 
   const htmlContent = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>${pdfTitle}</title>
+  <title>${escapeHtml(pdfTitle)}</title>
   <style>
     @page {
       size: A4 portrait;
@@ -293,9 +304,9 @@ export function printFeeSlip({ student, latestPayment = null }) {
             ${collegeLogoSvg}
           </div>
           <div>
-            <div class="college-title">${collegeName}</div>
-            <div class="college-meta">${collegeAddress}</div>
-            <div class="college-meta" style="color: #0d9488; font-weight: 600;">Phone: ${collegePhone}</div>
+            <div class="college-title">${escapeHtml(collegeName)}</div>
+            <div class="college-meta">${escapeHtml(collegeAddress)}</div>
+            <div class="college-meta" style="color: #0d9488; font-weight: 600;">Phone: ${escapeHtml(collegePhone)}</div>
           </div>
         </div>
         <div>
@@ -312,11 +323,11 @@ export function printFeeSlip({ student, latestPayment = null }) {
         </div>
         <div class="meta-item">
           <span class="label">Payment Date</span>
-          <span class="val">${formatDate(slipDate)}</span>
+          <span class="val">${escapeHtml(formatDate(slipDate))}</span>
         </div>
         <div class="meta-item" style="text-align: right;">
           <span class="label">Payment Method</span>
-          <span class="val">${latestPayment?.payment_method || 'Cash'}</span>
+          <span class="val">${escapeHtml(latestPayment?.payment_method || 'Cash')}</span>
         </div>
       </div>
 
@@ -325,38 +336,38 @@ export function printFeeSlip({ student, latestPayment = null }) {
         <div>
           <div class="info-row">
             <span class="k">Student Name:</span>
-            <span class="v">${student.student_name}</span>
+            <span class="v">${escapeHtml(student.student_name)}</span>
           </div>
           <div class="info-row">
             <span class="k">Father Name:</span>
-            <span class="v">${student.father_name}</span>
+            <span class="v">${escapeHtml(student.father_name)}</span>
           </div>
           <div class="info-row">
             <span class="k">Student CNIC:</span>
-            <span class="v" style="font-family: monospace;">${student.student_cnic || 'N/A'}</span>
+            <span class="v" style="font-family: monospace;">${escapeHtml(student.student_cnic || 'N/A')}</span>
           </div>
           <div class="info-row">
             <span class="k">Contact Number:</span>
-            <span class="v">${student.contact_number || 'N/A'}</span>
+            <span class="v">${escapeHtml(student.contact_number || 'N/A')}</span>
           </div>
         </div>
 
         <div>
           <div class="info-row">
             <span class="k">Admission Session:</span>
-            <span class="v" style="color: #0d9488;">${student.admission_session}</span>
+            <span class="v" style="color: #0d9488;">${escapeHtml(student.admission_session)}</span>
           </div>
           <div class="info-row">
             <span class="k">Admission Type:</span>
-            <span class="v">${student.admission_type}</span>
+            <span class="v">${escapeHtml(student.admission_type)}</span>
           </div>
           <div class="info-row">
             <span class="k">Program / Group:</span>
-            <span class="v">${student.program_group}</span>
+            <span class="v">${escapeHtml(student.program_group)}</span>
           </div>
           <div class="info-row">
             <span class="k">Academic Class:</span>
-            <span class="v" style="font-weight: 700; color: #0d9488;">${student.academic_class}</span>
+            <span class="v" style="font-weight: 700; color: #0d9488;">${escapeHtml(student.academic_class)}</span>
           </div>
         </div>
       </div>
@@ -373,26 +384,26 @@ export function printFeeSlip({ student, latestPayment = null }) {
           <tbody>
             <tr>
               <td>Total Academic Tuition Fee</td>
-              <td class="text-right font-bold" style="font-family: monospace;">${formatCurrency(totalFee)}</td>
+              <td class="text-right font-bold" style="font-family: monospace;">${escapeHtml(formatCurrency(totalFee))}</td>
             </tr>
             <tr>
               <td>Previously Paid Fee</td>
-              <td class="text-right" style="font-family: monospace; color: #475569;">${formatCurrency(previousPaid)}</td>
+              <td class="text-right" style="font-family: monospace; color: #475569;">${escapeHtml(formatCurrency(previousPaid))}</td>
             </tr>
             <tr style="background: #f0fdfa;">
               <td style="font-weight: 700; color: #0f766e;">Paid Amount (Current Transaction)</td>
-              <td class="text-right font-bold" style="font-family: monospace; color: #0f766e; font-size: 12.5px;">${formatCurrency(paidToday)}</td>
+              <td class="text-right font-bold" style="font-family: monospace; color: #0f766e; font-size: 12.5px;">${escapeHtml(formatCurrency(paidToday))}</td>
             </tr>
             <tr style="background: #f8fafc; font-weight: 700;">
               <td>Total Paid Fee to Date</td>
-              <td class="text-right font-bold" style="font-family: monospace; color: #15803d;">${formatCurrency(totalPaid)}</td>
+              <td class="text-right font-bold" style="font-family: monospace; color: #15803d;">${escapeHtml(formatCurrency(totalPaid))}</td>
             </tr>
             <tr style="background: ${remainingDues > 0 ? '#fffbeb' : '#f0fdf4'};">
               <td style="font-weight: 800; font-size: 12px; color: ${remainingDues > 0 ? '#b45309' : '#15803d'};">
                 ${remainingDues > 0 ? 'Remaining Outstanding Dues' : 'Remaining Balance'}
               </td>
               <td class="text-right font-bold" style="font-family: monospace; font-size: 13px; color: ${remainingDues > 0 ? '#b45309' : '#15803d'};">
-                ${formatCurrency(remainingDues)}
+                ${escapeHtml(formatCurrency(remainingDues))}
               </td>
             </tr>
           </tbody>
@@ -407,12 +418,12 @@ export function printFeeSlip({ student, latestPayment = null }) {
             ${isPaidInFull 
               ? 'All college admission fees are cleared. Thank you.' 
               : student.next_payment_due_date 
-                ? 'Promised / Next Due Date: ' + formatDate(student.next_payment_due_date)
+                ? 'Promised / Next Due Date: ' + escapeHtml(formatDate(student.next_payment_due_date))
                 : 'Please clear the remaining fee dues before deadline.'}
           </div>
         </div>
         <div class="dues-text">
-          ${isPaidInFull ? 'Balance: Rs. 0' : 'Dues: ' + formatCurrency(remainingDues)}
+          ${isPaidInFull ? 'Balance: Rs. 0' : 'Dues: ' + escapeHtml(formatCurrency(remainingDues))}
         </div>
       </div>
 
@@ -435,7 +446,7 @@ export function printFeeSlip({ student, latestPayment = null }) {
 
       <!-- Footer -->
       <div class="footer">
-        Computer Generated Official Receipt • ${collegeName} • System Verified
+        Computer Generated Official Receipt • ${escapeHtml(collegeName)} • System Verified
       </div>
     </div>
   </div>

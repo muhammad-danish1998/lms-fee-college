@@ -5,9 +5,28 @@ import { supabase } from '../lib/supabase';
  */
 export async function addPayment({ studentId, amount, paymentDate, paymentMethod = 'Cash', notes = '' }) {
   try {
-    const numAmount = Number(amount);
+    const numAmount = Math.round(Number(amount));
     if (!numAmount || numAmount <= 0) {
-      throw new Error('Payment amount must be greater than zero.');
+      throw new Error('Payment amount must be a valid number greater than zero.');
+    }
+
+    // Verify current student dues from database before insertion
+    const { data: student, error: studentErr } = await supabase
+      .from('students')
+      .select('total_fee, payments(amount)')
+      .eq('id', studentId)
+      .single();
+
+    if (studentErr || !student) {
+      throw new Error('Could not find student record to verify payment dues.');
+    }
+
+    const totalFee = Number(student.total_fee) || 0;
+    const currentPaid = (student.payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const remainingDues = Math.max(0, totalFee - currentPaid);
+
+    if (numAmount > remainingDues) {
+      throw new Error(`Payment of Rs. ${numAmount.toLocaleString()} exceeds remaining dues of Rs. ${remainingDues.toLocaleString()}.`);
     }
 
     const receiptNo = `RCP-${Date.now().toString().slice(-6)}`;
@@ -20,7 +39,7 @@ export async function addPayment({ studentId, amount, paymentDate, paymentMethod
         payment_date: paymentDate || new Date().toISOString().split('T')[0],
         payment_method: paymentMethod,
         receipt_no: receiptNo,
-        notes: notes || null
+        notes: notes ? String(notes).trim().slice(0, 500) : null
       }])
       .select()
       .single();

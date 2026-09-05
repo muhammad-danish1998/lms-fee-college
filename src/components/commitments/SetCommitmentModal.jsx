@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { X, Calendar, DollarSign, AlertCircle, Clock, FileText } from 'lucide-react';
 import { setStudentCommitment } from '../../services/commitmentService';
 import { formatCurrency } from '../../utils/feeCalculator';
@@ -14,12 +14,15 @@ export function SetCommitmentModal({ isOpen, onClose, student, onCommitmentSaved
   const [notes, setNotes] = useState(student.commitment_notes || '');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isLockedRef = useRef(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isLockedRef.current || isSubmitting) return;
+
     setError('');
 
-    const numAmount = Number(promisedAmount);
+    const numAmount = Math.round(Number(promisedAmount));
     if (!numAmount || numAmount <= 0) {
       setError('Please enter a valid promised amount greater than 0.');
       return;
@@ -36,6 +39,7 @@ export function SetCommitmentModal({ isOpen, onClose, student, onCommitmentSaved
     }
 
     try {
+      isLockedRef.current = true;
       setIsSubmitting(true);
       await setStudentCommitment({
         studentId: student.id,
@@ -51,6 +55,7 @@ export function SetCommitmentModal({ isOpen, onClose, student, onCommitmentSaved
     } catch (err) {
       setError(err.message || 'Failed to save commitment. Please try again.');
     } finally {
+      isLockedRef.current = false;
       setIsSubmitting(false);
     }
   };
