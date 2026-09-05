@@ -35,12 +35,15 @@ export function printFeeSlip({ student, latestPayment = null }) {
   const receiptNo = latestPayment?.receipt_no || `RCP-${student.id.slice(0, 6).toUpperCase()}`;
   const slipDate = latestPayment?.payment_date || new Date().toISOString().split('T')[0];
 
+  const cleanStudentName = (student.student_name || 'Student').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+  const pdfTitle = `Fee_Slip_${cleanStudentName}_${receiptNo}`;
+
   const htmlContent = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Fee Slip - ${student.student_name}</title>
+  <title>${pdfTitle}</title>
   <style>
     @page {
       size: A4 portrait;
@@ -435,6 +438,10 @@ export function printFeeSlip({ student, latestPayment = null }) {
 </html>
   `;
 
+  // Preserve original parent title
+  const originalTitle = document.title;
+  document.title = pdfTitle;
+
   // Create isolated iframe
   const iframe = document.createElement('iframe');
   iframe.style.position = 'fixed';
@@ -449,13 +456,17 @@ export function printFeeSlip({ student, latestPayment = null }) {
   doc.open();
   doc.write(htmlContent);
   doc.close();
+  doc.title = pdfTitle;
 
   // Print once iframe finishes loading
   iframe.contentWindow.focus();
   setTimeout(() => {
     iframe.contentWindow.print();
     setTimeout(() => {
-      document.body.removeChild(iframe);
-    }, 1000);
+      document.title = originalTitle;
+      if (document.body.contains(iframe)) {
+        document.body.removeChild(iframe);
+      }
+    }, 1500);
   }, 350);
 }
