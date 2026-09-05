@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Search, Plus, FileText, CreditCard, ArrowRight, AlertTriangle, ShieldCheck, Download, Trash2, Phone } from 'lucide-react';
+import { Users, Search, Plus, FileText, CreditCard, ArrowRight, AlertTriangle, ShieldCheck, Download, Trash2, Edit3, Phone } from 'lucide-react';
 import { getStudents, deleteStudent } from '../services/studentService';
 import { getAdmissionConfig } from '../services/configService';
 import { StatusBadge } from '../components/common/StatusBadge';
@@ -8,6 +8,7 @@ import { ProgressTracker } from '../components/progress/ProgressTracker';
 import { FeeSlipModal } from '../components/fee-slip/FeeSlipModal';
 import { AddPaymentModal } from '../components/payments/AddPaymentModal';
 import { ManageProgressModal } from '../components/progress/ManageProgressModal';
+import { EditStudentModal } from '../components/students/EditStudentModal';
 import { formatCurrency, formatDate } from '../utils/feeCalculator';
 import { exportStudentsToCSV } from '../utils/csvExport';
 
@@ -25,6 +26,7 @@ export function StudentsPage() {
   const [selectedStudentForSlip, setSelectedStudentForSlip] = useState(null);
   const [selectedStudentForPayment, setSelectedStudentForPayment] = useState(null);
   const [selectedStudentForProgress, setSelectedStudentForProgress] = useState(null);
+  const [selectedStudentForEdit, setSelectedStudentForEdit] = useState(null);
 
   const loadData = async () => {
     try {
@@ -67,7 +69,7 @@ export function StudentsPage() {
         <div>
           <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">Student Directory</h2>
           <p className="text-xs md:text-sm text-slate-400">
-            Search, filter, and inspect student records, fee status, and verification progress
+            Search, filter, edit, and inspect student records, fee status, and verification progress
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
@@ -194,6 +196,13 @@ export function StudentsPage() {
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       <StatusBadge status={student.fee_status} />
+                      <button
+                        onClick={() => setSelectedStudentForEdit(student)}
+                        title="Edit Student Profile"
+                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
                       <button
                         onClick={() => handleDelete(student.id, student.student_name)}
                         title="Delete Student"
@@ -397,6 +406,14 @@ export function StudentsPage() {
                           </button>
 
                           <button
+                            onClick={() => setSelectedStudentForEdit(student)}
+                            title="Edit Student Profile"
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700 transition-colors"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
                             onClick={() => handleDelete(student.id, student.student_name)}
                             title="Delete Student Record"
                             className="p-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-500/20 transition-colors"
@@ -449,6 +466,16 @@ export function StudentsPage() {
           onClose={() => setSelectedStudentForProgress(null)}
           student={selectedStudentForProgress}
           onProgressUpdated={() => loadData()}
+        />
+      )}
+
+      {/* Edit Student Modal */}
+      {selectedStudentForEdit && (
+        <EditStudentModal
+          isOpen={!!selectedStudentForEdit}
+          onClose={() => setSelectedStudentForEdit(null)}
+          student={selectedStudentForEdit}
+          onStudentUpdated={() => loadData()}
         />
       )}
     </div>
