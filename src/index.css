@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-900 text-slate-100 font-sans antialiased;
+  }
+}
+
+/* Production-grade Printable Slip Styles */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Hide all app background elements */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* Display exclusively the printable fee slip */
+  #printable-fee-slip,
+  #printable-fee-slip * {
+    visibility: visible !important;
+  }
+
+  #printable-fee-slip {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 15px !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border: 2px solid #0d9488 !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+    display: block !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Print specific color overrides for high contrast black/teal printing */
+  #printable-fee-slip .print-dark-text {
+    color: #0f172a !important;
+  }
+  #printable-fee-slip .print-muted-text {
+    color: #475569 !important;
+  }
+  #printable-fee-slip .print-bg-light {
+    background-color: #f8fafc !important;
+    border-color: #cbd5e1 !important;
+  }
+  #printable-fee-slip .print-border {
+    border-color: #cbd5e1 !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
