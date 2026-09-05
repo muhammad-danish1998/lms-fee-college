@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { ShieldCheck, LogOut, KeyRound, Menu, X } from 'lucide-react';
+import { ShieldCheck, LogOut, KeyRound, Menu, X, Download } from 'lucide-react';
 import { CollegeLogo } from '../common/CollegeLogo';
 import { useAuth } from '../../context/AuthContext';
+import { usePWAInstallPrompt } from '../../hooks/usePWAInstallPrompt';
 import { UpdateCredentialsModal } from '../auth/UpdateCredentialsModal';
 
 export function Navbar({ onToggleMobileMenu, mobileMenuOpen }) {
   const { user, logout } = useAuth();
+  const { isInstallable, installApp } = usePWAInstallPrompt();
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const collegeName = import.meta.env.COLLEGE_NAME || "JMT Public Higher Secondary School and College";
 
@@ -45,6 +47,18 @@ export function Navbar({ onToggleMobileMenu, mobileMenuOpen }) {
 
         {/* Right: User Profile & Actions */}
         <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          {/* PWA Install Button (renders when installable) */}
+          {isInstallable && (
+            <button
+              onClick={installApp}
+              title="Install JMT Fee LMS App on this device"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/40 text-xs font-bold transition-all animate-pulse"
+            >
+              <Download className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Install App</span>
+            </button>
+          )}
+
           {/* User Info Badge */}
           <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700 text-xs">
             <div className="w-6 h-6 rounded-lg bg-teal-500/20 text-teal-300 font-bold flex items-center justify-center text-[11px]">
