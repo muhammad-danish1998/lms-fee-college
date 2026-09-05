@@ -13,10 +13,8 @@ dist
 dist-ssr
 *.local
 
-# Environment & Secrets (CRITICAL: Never push secrets!)
-.env
-.env.local
-.env.*.local
+# Environment & Secrets (Ignore ALL .env files)
+.env*
 
 # Internal AI & Agent instructions
 AGENTS.md
