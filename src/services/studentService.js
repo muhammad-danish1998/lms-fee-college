@@ -188,7 +188,7 @@ export async function createStudent(studentData, initialPayment = null) {
 
     // 1. Insert student record
     const initialDues = Math.max(0, totalFee - (Number(initialPayment?.amount) || 0));
-    const hasInitialCommitment = initialDues > 0 && studentData.next_payment_due_date;
+    const hasInitialCommitment = initialDues > 0 && (studentData.next_payment_due_date || studentData.commitment_notes);
 
     const { data: student, error: studentError } = await supabase
       .from('students')
@@ -248,17 +248,21 @@ export async function createStudent(studentData, initialPayment = null) {
       }
     }
 
-    // 3. If dues remain and date was set, create the initial fee_commitments record
+    // 3. If dues remain and date or milestone was set, create the initial fee_commitments record
     if (hasInitialCommitment) {
-      await supabase
-        .from('fee_commitments')
-        .insert([{
-          student_id: student.id,
-          promised_amount: Number(studentData.promised_amount) || initialDues,
-          promised_date: studentData.next_payment_due_date,
-          status: 'Active',
-          reason_or_notes: studentData.commitment_notes || 'Initial admission fee commitment'
-        }]);
+      try {
+        await supabase
+          .from('fee_commitments')
+          .insert([{
+            student_id: student.id,
+            promised_amount: Number(studentData.promised_amount) || initialDues,
+            promised_date: studentData.next_payment_due_date || null,
+            status: 'Active',
+            reason_or_notes: studentData.commitment_notes || 'Initial admission fee commitment'
+          }]);
+      } catch (commitErr) {
+        console.warn('Initial commitment record insert error:', commitErr);
+      }
     }
 
     return student;
@@ -303,6 +307,8 @@ export async function updateStudent(id, studentData) {
         academic_class: studentData.academic_class,
         total_fee: Number(studentData.total_fee) || 0,
         next_payment_due_date: studentData.next_payment_due_date || null,
+        commitment_notes: studentData.commitment_notes !== undefined ? studentData.commitment_notes : undefined,
+        commitment_status: studentData.commitment_status !== undefined ? studentData.commitment_status : undefined,
         updated_at: new Date().toISOString()
       })
       .eq('id', id)

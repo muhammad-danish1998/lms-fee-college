@@ -418,7 +418,9 @@ export function printFeeSlip({ student, latestPayment = null }) {
             ${isPaidInFull 
               ? 'All college admission fees are cleared. Thank you.' 
               : student.next_payment_due_date 
-                ? 'Promised / Next Due Date: ' + escapeHtml(formatDate(student.next_payment_due_date))
+                ? 'Promised / Next Due Date: ' + escapeHtml(formatDate(student.next_payment_due_date)) + (student.commitment_notes ? ' (' + escapeHtml(student.commitment_notes) + ')' : '')
+                : student.commitment_notes
+                ? 'Due Condition / Milestone: <strong>' + escapeHtml(student.commitment_notes) + '</strong>'
                 : 'Please clear the remaining fee dues before deadline.'}
           </div>
         </div>

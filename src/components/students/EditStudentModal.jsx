@@ -26,7 +26,8 @@ export function EditStudentModal({ isOpen, onClose, student, onStudentUpdated })
     program_group: student.program_group || '',
     academic_class: student.academic_class || '',
     total_fee: student.total_fee || 0,
-    next_payment_due_date: student.next_payment_due_date || ''
+    next_payment_due_date: student.next_payment_due_date || '',
+    commitment_notes: student.commitment_notes || ''
   });
 
   useEffect(() => {
@@ -98,6 +99,7 @@ export function EditStudentModal({ isOpen, onClose, student, onStudentUpdated })
         program_group: formData.program_group,
         academic_class: formData.academic_class,
         total_fee: totalFeeNum,
+        commitment_notes: formData.commitment_notes?.trim() || null,
         next_payment_due_date: formData.next_payment_due_date || null
       });
 
@@ -284,7 +286,7 @@ export function EditStudentModal({ isOpen, onClose, student, onStudentUpdated })
 
           {/* Fee & Dues */}
           <div className="pt-2 border-t border-slate-800">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">3. Fee Details</h4>
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">3. Fee &amp; Payment Commitment</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
               <div>
                 <label className="block text-slate-300 mb-1 font-medium">Total Course Fee (PKR)</label>
@@ -302,12 +304,25 @@ export function EditStudentModal({ isOpen, onClose, student, onStudentUpdated })
               </div>
 
               <div>
-                <label className="block text-slate-300 mb-1 font-medium">Next Due Date</label>
+                <label className="block text-slate-300 mb-1 font-medium">Next Due Date (Optional)</label>
                 <input
                   type="date"
                   value={formData.next_payment_due_date}
                   onChange={(e) => setFormData({ ...formData, next_payment_due_date: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-teal-500"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-teal-500 font-mono"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-slate-300 mb-1 font-medium">
+                  Milestone / Stage Condition (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. On Enrollment Card Issuance / On Examination in Verification"
+                  value={formData.commitment_notes}
+                  onChange={(e) => setFormData({ ...formData, commitment_notes: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 text-xs"
                 />
               </div>
             </div>

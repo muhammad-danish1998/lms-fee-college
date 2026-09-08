@@ -31,7 +31,13 @@ export function FeeSlipModal({ isOpen, onClose, student, latestPayment = null })
     if (isPaidInFull) {
       message = `*${collegeName}*\n*OFFICIAL FEE PAYMENT SLIP*\n\nDear *${student.student_name}* (S/O ${student.father_name}),\n\nYour fee payment has been received successfully.\n\nReceipt No: ${receiptNo}\nPayment Date: ${formatDate(slipDate)}\nClass & Group: ${student.academic_class} - ${student.program_group}\n\n*Total Fee:* ${formatCurrency(totalFee)}\n*Total Paid:* ${formatCurrency(totalPaid)}\n*Remaining Dues:* Rs. 0\n*Status:* PAID IN FULL\n\nThank you.\n${collegeName}\n${collegePhone}`;
     } else {
-      message = `*${collegeName}*\n*OFFICIAL FEE PAYMENT SLIP*\n\nDear *${student.student_name}* (S/O ${student.father_name}),\n\nYour fee payment${paidToday > 0 ? ` of *${formatCurrency(paidToday)}*` : ''} has been recorded.\n\nReceipt No: ${receiptNo}\nPayment Date: ${formatDate(slipDate)}\nClass & Group: ${student.academic_class} - ${student.program_group}\n\n*Total Fee:* ${formatCurrency(totalFee)}\n*Total Paid:* ${formatCurrency(totalPaid)}\n*Remaining Dues:* ${formatCurrency(remainingDues)}\n${student.next_payment_due_date ? `*Due Date:* ${formatDate(student.next_payment_due_date)}\n` : ''}\nThank you.\n${collegeName}\n${collegePhone}`;
+      const dueScheduleInfo = student.next_payment_due_date
+        ? `*Due Date:* ${formatDate(student.next_payment_due_date)}${student.commitment_notes ? ` (${student.commitment_notes})` : ''}`
+        : student.commitment_notes
+        ? `*Due Condition / Stage:* ${student.commitment_notes}`
+        : '';
+
+      message = `*${collegeName}*\n*OFFICIAL FEE PAYMENT SLIP*\n\nDear *${student.student_name}* (S/O ${student.father_name}),\n\nYour fee payment${paidToday > 0 ? ` of *${formatCurrency(paidToday)}*` : ''} has been recorded.\n\nReceipt No: ${receiptNo}\nPayment Date: ${formatDate(slipDate)}\nClass & Group: ${student.academic_class} - ${student.program_group}\n\n*Total Fee:* ${formatCurrency(totalFee)}\n*Total Paid:* ${formatCurrency(totalPaid)}\n*Remaining Dues:* ${formatCurrency(remainingDues)}\n${dueScheduleInfo ? `${dueScheduleInfo}\n` : ''}\nThank you.\n${collegeName}\n${collegePhone}`;
     }
 
     const cleanPhone = (student.contact_number || '').replace(/[^0-9]/g, '');
@@ -203,8 +209,19 @@ export function FeeSlipModal({ isOpen, onClose, student, latestPayment = null })
                     <div>
                       <div className="font-bold text-sm tracking-wide">STATUS: PAYMENT DUE</div>
                       <div className="text-[11px] opacity-90">
-                        Next Due Date: <span className="font-bold underline">{formatDate(student.next_payment_due_date)}</span>
-                        {student.promised_amount ? ` (Promised: ${formatCurrency(student.promised_amount)})` : ''}
+                        {student.next_payment_due_date ? (
+                          <>
+                            Next Due Date: <span className="font-bold underline">{formatDate(student.next_payment_due_date)}</span>
+                            {student.commitment_notes ? ` (${student.commitment_notes})` : ''}
+                          </>
+                        ) : student.commitment_notes ? (
+                          <>
+                            Due Condition / Milestone: <span className="font-bold underline text-amber-300 print-dark-text">{student.commitment_notes}</span>
+                          </>
+                        ) : (
+                          'Please clear remaining fee dues before deadlines.'
+                        )}
+                        {student.promised_amount ? ` • Promised: ${formatCurrency(student.promised_amount)}` : ''}
                       </div>
                     </div>
                   </div>

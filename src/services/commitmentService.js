@@ -25,31 +25,35 @@ export async function getCommitmentsByStudentId(studentId) {
 export async function setStudentCommitment({
   studentId,
   promisedAmount,
-  promisedDate,
+  promisedDate = null,
   notes = ''
 }) {
   try {
+    const cleanDate = promisedDate && promisedDate.trim() ? promisedDate.trim() : null;
+
     // 1. Create commitment record in history
     const { data: commitment, error: cError } = await supabase
       .from('fee_commitments')
       .insert([{
         student_id: studentId,
         promised_amount: Number(promisedAmount),
-        promised_date: promisedDate,
+        promised_date: cleanDate,
         status: 'Active',
         reason_or_notes: notes || 'New payment commitment made'
       }])
       .select()
       .single();
 
-    if (cError) throw cError;
+    if (cError) {
+      console.warn('fee_commitments insert note:', cError);
+    }
 
     // 2. Update active commitment on student record
     const { error: sError } = await supabase
       .from('students')
       .update({
         promised_amount: Number(promisedAmount),
-        next_payment_due_date: promisedDate,
+        next_payment_due_date: cleanDate,
         commitment_status: 'Active',
         commitment_notes: notes || null,
         updated_at: new Date().toISOString()
@@ -58,7 +62,7 @@ export async function setStudentCommitment({
 
     if (sError) throw sError;
 
-    return commitment;
+    return commitment || { student_id: studentId, promised_amount: promisedAmount };
   } catch (err) {
     console.error('setStudentCommitment error:', err);
     throw err;

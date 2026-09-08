@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UserPlus, User, BookOpen, DollarSign, Calendar, AlertCircle, CheckCircle2, ArrowLeft, CreditCard, ShieldAlert } from 'lucide-react';
+import { UserPlus, User, BookOpen, DollarSign, Calendar, AlertCircle, CheckCircle2, ArrowLeft, CreditCard, ShieldAlert, Clock, Award } from 'lucide-react';
 import { createStudent, checkDuplicateStudentCnic } from '../services/studentService';
 import { getAdmissionConfig } from '../services/configService';
 import { calculateDues, formatCurrency } from '../utils/feeCalculator';
@@ -14,6 +14,11 @@ export function EnrollStudentPage() {
   const [formError, setFormError] = useState('');
   const [cnicChecking, setCnicChecking] = useState(false);
   const [cnicDuplicateError, setCnicDuplicateError] = useState('');
+
+  // Commitment mode state when dues > 0
+  const [commitmentType, setCommitmentType] = useState('stage'); // 'stage' | 'date' | 'both'
+  const [selectedStagePreset, setSelectedStagePreset] = useState('On Enrollment Card Issuance');
+  const [customStageNote, setCustomStageNote] = useState('');
 
   // Form fields
   const [formData, setFormData] = useState({
@@ -189,6 +194,19 @@ export function EnrollStudentPage() {
         return;
       }
 
+      // Compute commitment notes and date based on selected mode
+      let finalCommitmentNote = null;
+      let finalDueDate = null;
+
+      if (duesNum > 0) {
+        if (commitmentType === 'stage' || commitmentType === 'both') {
+          finalCommitmentNote = customStageNote.trim() || selectedStagePreset || 'On Enrollment Card Issuance';
+        }
+        if (commitmentType === 'date' || commitmentType === 'both') {
+          finalDueDate = formData.next_payment_due_date || null;
+        }
+      }
+
       const student = await createStudent(
         {
           student_name: trimmedName,
@@ -204,7 +222,8 @@ export function EnrollStudentPage() {
           program_group: program,
           academic_class: academicClass,
           total_fee: totalFeeNum,
-          next_payment_due_date: duesNum > 0 ? formData.next_payment_due_date || null : null
+          commitment_notes: finalCommitmentNote,
+          next_payment_due_date: finalDueDate
         },
         initialPaidNum > 0
           ? {
@@ -562,22 +581,125 @@ export function EnrollStudentPage() {
                 </select>
               </div>
             )}
-
-            {/* Next Due Date (if dues > 0) */}
-            {duesNum > 0 && (
-              <div>
-                <label className="block text-xs font-semibold text-amber-300 mb-1.5">
-                  Next Payment Due Date
-                </label>
-                <input
-                  type="date"
-                  value={formData.next_payment_due_date}
-                  onChange={(e) => setFormData({ ...formData, next_payment_due_date: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-amber-500/40 text-white text-sm focus:outline-none focus:border-amber-500"
-                />
-              </div>
-            )}
           </div>
+
+          {/* Dues Commitment Section (When Dues > 0) */}
+          {duesNum > 0 && (
+            <div className="mt-5 p-4 rounded-xl bg-slate-950/90 border border-amber-500/30 space-y-3.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <label className="text-xs font-bold text-amber-300 flex items-center gap-1.5 uppercase tracking-wide">
+                  <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>Remaining Fee Payment Schedule / Condition (Optional)</span>
+                </label>
+                <span className="text-[10px] text-slate-400">Select how the student will pay</span>
+              </div>
+
+              {/* Toggle: Milestone Stage vs Calendar Date vs Both */}
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setCommitmentType('stage')}
+                  className={`py-2 px-2.5 rounded-xl font-semibold border transition-all text-center flex items-center justify-center gap-1.5 ${
+                    commitmentType === 'stage'
+                      ? 'bg-teal-500/20 text-teal-300 border-teal-500/60 shadow-sm'
+                      : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                  }`}
+                >
+                  <Award className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+                  <span className="truncate">Stage Milestone</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setCommitmentType('date')}
+                  className={`py-2 px-2.5 rounded-xl font-semibold border transition-all text-center flex items-center justify-center gap-1.5 ${
+                    commitmentType === 'date'
+                      ? 'bg-teal-500/20 text-teal-300 border-teal-500/60 shadow-sm'
+                      : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                  }`}
+                >
+                  <Calendar className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+                  <span className="truncate">Calendar Date</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setCommitmentType('both')}
+                  className={`py-2 px-2.5 rounded-xl font-semibold border transition-all text-center flex items-center justify-center gap-1.5 ${
+                    commitmentType === 'both'
+                      ? 'bg-teal-500/20 text-teal-300 border-teal-500/60 shadow-sm'
+                      : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                  }`}
+                >
+                  <Clock className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+                  <span className="truncate">Date &amp; Stage</span>
+                </button>
+              </div>
+
+              {/* Stage Milestone Selection */}
+              {(commitmentType === 'stage' || commitmentType === 'both') && (
+                <div className="space-y-2 pt-1">
+                  <div className="text-[11px] font-semibold text-slate-300">
+                    Payment Milestone Condition:
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {[
+                      { title: 'On Enrollment Card Issuance', desc: 'When Enrollment Card is delivered' },
+                      { title: 'On Examination in Verification', desc: 'When Examination is submitted' },
+                      { title: 'On Admit Card Issuance', desc: 'When Admit Card is ready' },
+                      { title: 'On Class Commencement', desc: 'When regular classes start' },
+                    ].map((preset) => (
+                      <button
+                        key={preset.title}
+                        type="button"
+                        onClick={() => {
+                          setSelectedStagePreset(preset.title);
+                          setCustomStageNote('');
+                        }}
+                        className={`p-2.5 rounded-xl border text-left text-xs transition-all ${
+                          selectedStagePreset === preset.title && !customStageNote
+                            ? 'bg-teal-950/60 text-teal-200 border-teal-500/60 ring-1 ring-teal-500/40'
+                            : 'bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800/80'
+                        }`}
+                      >
+                        <div className="font-semibold">{preset.title}</div>
+                        <div className="text-[10px] text-slate-400">{preset.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Custom Stage Note */}
+                  <div className="pt-1.5">
+                    <label className="block text-[10px] text-slate-400 mb-1 font-medium">
+                      Or custom condition / notes (optional):
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Promised to pay remaining 10,000 when enrollment card is issued"
+                      value={customStageNote}
+                      onChange={(e) => setCustomStageNote(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-teal-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Specific Calendar Date Selection */}
+              {(commitmentType === 'date' || commitmentType === 'both') && (
+                <div className="pt-1">
+                  <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                    Specific Payment Due Date:
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.next_payment_due_date}
+                    onChange={(e) => setFormData({ ...formData, next_payment_due_date: e.target.value })}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-teal-500 font-mono"
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Automatic Dues Calculation Preview (Sections 13 & 17) */}
           <div className="mt-6 p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">

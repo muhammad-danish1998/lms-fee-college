@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X, Calendar, DollarSign, AlertCircle, Clock, FileText } from 'lucide-react';
+import { X, Calendar, DollarSign, AlertCircle, Clock, Award } from 'lucide-react';
 import { setStudentCommitment } from '../../services/commitmentService';
 import { formatCurrency } from '../../utils/feeCalculator';
 
@@ -8,10 +8,20 @@ export function SetCommitmentModal({ isOpen, onClose, student, onCommitmentSaved
 
   const remainingDues = Number(student.dues) || 0;
   const [promisedAmount, setPromisedAmount] = useState(student.promised_amount || remainingDues || '');
+  const [commitmentMode, setCommitmentMode] = useState(
+    student.next_payment_due_date && student.commitment_notes
+      ? 'both'
+      : student.next_payment_due_date
+      ? 'date'
+      : 'stage'
+  );
   const [promisedDate, setPromisedDate] = useState(
     student.next_payment_due_date || new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0]
   );
-  const [notes, setNotes] = useState(student.commitment_notes || '');
+  const [selectedStagePreset, setSelectedStagePreset] = useState(
+    student.commitment_notes || 'On Enrollment Card Issuance'
+  );
+  const [customNotes, setCustomNotes] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isLockedRef = useRef(false);
@@ -33,10 +43,19 @@ export function SetCommitmentModal({ isOpen, onClose, student, onCommitmentSaved
       return;
     }
 
-    if (!promisedDate) {
+    if (commitmentMode === 'date' && !promisedDate) {
       setError('Please select a valid committed payment date.');
       return;
     }
+
+    let finalNotes = null;
+    if (commitmentMode === 'stage' || commitmentMode === 'both') {
+      finalNotes = customNotes.trim() || selectedStagePreset || 'On Enrollment Card Issuance';
+    } else if (customNotes.trim()) {
+      finalNotes = customNotes.trim();
+    }
+
+    const finalDate = (commitmentMode === 'date' || commitmentMode === 'both') ? (promisedDate || null) : null;
 
     try {
       isLockedRef.current = true;
@@ -44,8 +63,8 @@ export function SetCommitmentModal({ isOpen, onClose, student, onCommitmentSaved
       await setStudentCommitment({
         studentId: student.id,
         promisedAmount: numAmount,
-        promisedDate,
-        notes
+        promisedDate: finalDate,
+        notes: finalNotes || 'Payment commitment updated'
       });
 
       if (onCommitmentSaved) {
@@ -107,7 +126,7 @@ export function SetCommitmentModal({ isOpen, onClose, student, onCommitmentSaved
                 max={remainingDues}
                 value={promisedAmount}
                 onChange={(e) => setPromisedAmount(e.target.value)}
-                placeholder="e.g. 30000"
+                placeholder="e.g. 10000"
                 required
                 className="w-full px-3.5 py-2.5 rounded-lg bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm font-medium"
               />
@@ -121,30 +140,112 @@ export function SetCommitmentModal({ isOpen, onClose, student, onCommitmentSaved
             </div>
           </div>
 
-          {/* Promised Date */}
+          {/* Commitment Mode Selector */}
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
-              Promised Payment Date <span className="text-rose-400">*</span>
+            <label className="block text-xs font-medium text-slate-300 mb-1.5">
+              Commitment Type:
             </label>
-            <input
-              type="date"
-              value={promisedDate}
-              onChange={(e) => setPromisedDate(e.target.value)}
-              required
-              className="w-full px-3.5 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm"
-            />
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => setCommitmentMode('stage')}
+                className={`py-2 px-2 rounded-lg font-semibold border transition-all text-center flex items-center justify-center gap-1 ${
+                  commitmentMode === 'stage'
+                    ? 'bg-teal-500/20 text-teal-300 border-teal-500/60 shadow-sm'
+                    : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'
+                }`}
+              >
+                <Award className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+                <span className="truncate">Stage Milestone</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCommitmentMode('date')}
+                className={`py-2 px-2 rounded-lg font-semibold border transition-all text-center flex items-center justify-center gap-1 ${
+                  commitmentMode === 'date'
+                    ? 'bg-teal-500/20 text-teal-300 border-teal-500/60 shadow-sm'
+                    : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+                <span className="truncate">Calendar Date</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCommitmentMode('both')}
+                className={`py-2 px-2 rounded-lg font-semibold border transition-all text-center flex items-center justify-center gap-1 ${
+                  commitmentMode === 'both'
+                    ? 'bg-teal-500/20 text-teal-300 border-teal-500/60 shadow-sm'
+                    : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+                <span className="truncate">Date &amp; Stage</span>
+              </button>
+            </div>
           </div>
 
-          {/* Reason / Notes */}
+          {/* Stage Preset Condition Options */}
+          {(commitmentMode === 'stage' || commitmentMode === 'both') && (
+            <div className="space-y-2">
+              <label className="block text-xs font-medium text-slate-300">
+                Milestone / Verification Stage Condition:
+              </label>
+              <div className="grid grid-cols-2 gap-1.5 text-xs">
+                {[
+                  'On Enrollment Card Issuance',
+                  'On Examination in Verification',
+                  'On Admit Card Issuance',
+                  'On Class Commencement',
+                ].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => {
+                      setSelectedStagePreset(preset);
+                      setCustomNotes('');
+                    }}
+                    className={`p-2 rounded-lg border text-left transition-all ${
+                      selectedStagePreset === preset && !customNotes
+                        ? 'bg-teal-950 text-teal-300 border-teal-500/60 ring-1 ring-teal-500/30'
+                        : 'bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-850'
+                    }`}
+                  >
+                    <span className="font-semibold block text-[11px]">{preset}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Promised Date */}
+          {(commitmentMode === 'date' || commitmentMode === 'both') && (
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1">
+                Promised Payment Date <span className="text-rose-400">*</span>
+              </label>
+              <input
+                type="date"
+                value={promisedDate}
+                onChange={(e) => setPromisedDate(e.target.value)}
+                required={commitmentMode === 'date'}
+                className="w-full px-3.5 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm font-mono"
+              />
+            </div>
+          )}
+
+          {/* Reason / Custom Notes */}
           <div>
             <label className="block text-xs font-medium text-slate-300 mb-1">
-              Commitment Notes / Reason for Date
+              Custom Condition Notes / Reason (Optional)
             </label>
             <input
               type="text"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="e.g. Promised to pay after father's salary on 15th"
+              value={customNotes}
+              onChange={(e) => setCustomNotes(e.target.value)}
+              placeholder="e.g. Will pay remaining Rs. 10,000 when enrollment card is issued"
               className="w-full px-3.5 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm"
             />
           </div>

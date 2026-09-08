@@ -322,21 +322,39 @@ export function DashboardPage() {
                   </div>
 
                   {/* Fee Numbers Grid */}
-                  <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80 text-xs font-mono">
-                    <div>
-                      <span className="text-[10px] text-slate-500 block uppercase">Total</span>
-                      <span className="text-slate-200 font-medium">{formatCurrency(student.total_fee)}</span>
+                  <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-1.5">
+                    <div className="grid grid-cols-3 gap-2 text-xs font-mono">
+                      <div>
+                        <span className="text-[10px] text-slate-500 block uppercase">Total</span>
+                        <span className="text-slate-200 font-medium">{formatCurrency(student.total_fee)}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 block uppercase">Paid</span>
+                        <span className="text-emerald-400 font-bold">{formatCurrency(student.total_paid)}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 block uppercase">Dues</span>
+                        <span className={`font-bold ${student.dues > 0 ? 'text-amber-400' : 'text-slate-400'}`}>
+                          {formatCurrency(student.dues)}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-[10px] text-slate-500 block uppercase">Paid</span>
-                      <span className="text-emerald-400 font-bold">{formatCurrency(student.total_paid)}</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-500 block uppercase">Dues</span>
-                      <span className={`font-bold ${student.dues > 0 ? 'text-amber-400' : 'text-slate-400'}`}>
-                        {formatCurrency(student.dues)}
-                      </span>
-                    </div>
+
+                    {student.dues > 0 && (
+                      <div className="pt-1 border-t border-slate-900 text-[10.5px]">
+                        {student.next_payment_due_date ? (
+                          <div className="text-slate-400">
+                            Due Date: <span className="font-semibold text-slate-200">{formatDate(student.next_payment_due_date)}</span>
+                            {student.commitment_notes ? <span className="text-teal-400/90 ml-1">({student.commitment_notes})</span> : ''}
+                          </div>
+                        ) : student.commitment_notes ? (
+                          <div className="text-teal-300 font-medium flex items-center gap-1">
+                            <span>🎓 Due:</span>
+                            <span>{student.commitment_notes}</span>
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
 
                   {/* Progress Tracker Stepper (Clickable) */}
@@ -456,14 +474,25 @@ export function DashboardPage() {
                           </span>
                         </td>
 
-                        {/* Fee Status & Due Date */}
+                        {/* Fee Status & Due Date / Milestone Condition */}
                         <td className="py-3.5 px-4">
                           <div className="space-y-1">
                             <StatusBadge status={student.fee_status} />
-                            {student.dues > 0 && student.next_payment_due_date && (
-                              <div className="text-[10px] text-slate-400">
-                                Due: <span className="text-slate-200">{formatDate(student.next_payment_due_date)}</span>
-                              </div>
+                            {student.dues > 0 && (
+                              student.next_payment_due_date ? (
+                                <div className="text-[10px] text-slate-400">
+                                  Due: <span className="text-slate-200 font-medium">{formatDate(student.next_payment_due_date)}</span>
+                                  {student.commitment_notes && (
+                                    <span className="text-teal-400/90 block text-[9.5px] line-clamp-1 mt-0.5">
+                                      {student.commitment_notes}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : student.commitment_notes ? (
+                                <div className="text-[10px] text-teal-300 font-medium line-clamp-2 max-w-[150px]">
+                                  🎓 {student.commitment_notes}
+                                </div>
+                              ) : null
                             )}
                           </div>
                         </td>
