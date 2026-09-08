@@ -538,14 +538,6 @@ export function DashboardPage() {
                             )}
 
                             <button
-                              onClick={() => setSelectedStudentForProgress(student)}
-                              title="Manage / Tick Stages"
-                              className="p-1.5 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 transition-colors"
-                            >
-                              <ShieldCheck className="w-3.5 h-3.5" />
-                            </button>
-
-                            <button
                               onClick={() => setSelectedStudentForSlip(student)}
                               title="Generate Fee Slip"
                               className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
