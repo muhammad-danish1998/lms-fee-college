@@ -1,5 +1,34 @@
 import { supabase } from '../lib/supabase';
 import { calculateTotalPaid, calculateDues, calculateFeeStatus } from '../utils/feeCalculator';
+import { isValidCNIC, formatCNIC } from '../utils/cnicHelper';
+
+/**
+ * Check if a student with the given CNIC already exists in the database
+ * @param {string} cnic - Student CNIC to check
+ * @param {string} [excludeStudentId] - Optional student ID to exclude (used during updates)
+ * @returns {Promise<Object|null>} - Existing student record if found, otherwise null
+ */
+export async function checkDuplicateStudentCnic(cnic, excludeStudentId = null) {
+  if (!cnic || !cnic.trim()) return null;
+  const formattedCnic = formatCNIC(cnic.trim());
+
+  let query = supabase
+    .from('students')
+    .select('id, student_name, student_cnic, father_name, admission_session, academic_class')
+    .eq('student_cnic', formattedCnic);
+
+  if (excludeStudentId) {
+    query = query.neq('id', excludeStudentId);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('Error checking duplicate CNIC:', error);
+    throw error;
+  }
+
+  return (data && data.length > 0) ? data[0] : null;
+}
 
 /**
  * Fetch all students with their payments
@@ -120,31 +149,68 @@ export async function getStudentById(id) {
  */
 export async function createStudent(studentData, initialPayment = null) {
   try {
+    // 0. Strict Validation of All Required Fields
+    const trimmedName = (studentData.student_name || '').trim();
+    const trimmedFatherName = (studentData.father_name || '').trim();
+    const gender = (studentData.gender || '').trim();
+    const rawCnic = (studentData.student_cnic || '').trim();
+    const formattedCnic = formatCNIC(rawCnic);
+    const admissionSession = (studentData.admission_session || '').trim();
+    const admissionType = (studentData.admission_type || '').trim();
+    const programGroup = (studentData.program_group || '').trim();
+    const academicClass = (studentData.academic_class || '').trim();
+    const totalFee = studentData.total_fee !== '' && studentData.total_fee !== null && studentData.total_fee !== undefined
+      ? Number(studentData.total_fee)
+      : NaN;
+
+    if (!trimmedName) throw new Error('Student Name is required.');
+    if (!trimmedFatherName) throw new Error('Father Name is required.');
+    if (!gender) throw new Error('Gender is required.');
+    if (!rawCnic) throw new Error('Student CNIC is required.');
+    if (!isValidCNIC(formattedCnic)) {
+      throw new Error('Student CNIC must follow the required format: XXXXX-XXXXXXX-X (13 digits).');
+    }
+    if (!admissionSession) throw new Error('Admission Session is required.');
+    if (!admissionType) throw new Error('Admission Type is required.');
+    if (!programGroup) throw new Error('Program / Group is required.');
+    if (!academicClass) throw new Error('Academic Class is required.');
+    if (isNaN(totalFee) || totalFee < 0) {
+      throw new Error('Total Fee is required and must be a non-negative amount.');
+    }
+
+    // Check duplicate student CNIC
+    const duplicate = await checkDuplicateStudentCnic(formattedCnic);
+    if (duplicate) {
+      throw new Error(
+        `A student is already enrolled with CNIC "${formattedCnic}" (${duplicate.student_name} S/O ${duplicate.father_name} - Class: ${duplicate.academic_class}). Duplicate CNIC is not permitted.`
+      );
+    }
+
     // 1. Insert student record
-    const initialDues = Math.max(0, (Number(studentData.total_fee) || 0) - (Number(initialPayment?.amount) || 0));
+    const initialDues = Math.max(0, totalFee - (Number(initialPayment?.amount) || 0));
     const hasInitialCommitment = initialDues > 0 && studentData.next_payment_due_date;
 
     const { data: student, error: studentError } = await supabase
       .from('students')
       .insert([{
-        student_name: studentData.student_name,
-        father_name: studentData.father_name,
+        student_name: trimmedName,
+        father_name: trimmedFatherName,
         date_of_birth: studentData.date_of_birth || null,
-        student_cnic: studentData.student_cnic || null,
-        father_cnic: studentData.father_cnic || null,
-        gender: studentData.gender || 'Male',
+        student_cnic: formattedCnic,
+        father_cnic: studentData.father_cnic ? formatCNIC(studentData.father_cnic) : null,
+        gender: gender || 'Male',
         contact_number: studentData.contact_number || null,
         reference: studentData.reference || null,
-        admission_session: studentData.admission_session,
-        admission_type: studentData.admission_type,
-        program_group: studentData.program_group,
-        academic_class: studentData.academic_class,
-        total_fee: Number(studentData.total_fee) || 0,
+        admission_session: admissionSession,
+        admission_type: admissionType,
+        program_group: programGroup,
+        academic_class: academicClass,
+        total_fee: totalFee,
         promised_amount: hasInitialCommitment ? (Number(studentData.promised_amount) || initialDues) : null,
         commitment_status: hasInitialCommitment ? 'Active' : (initialDues === 0 ? 'Fulfilled' : 'None'),
         commitment_notes: studentData.commitment_notes || null,
         next_payment_due_date: studentData.next_payment_due_date || null,
-        enrollment_verification: false, // Initial state: false until staff verifies
+        enrollment_verification: false,
         enrollment_verification_date: null,
         enrollment_card_issued: false,
         enrollment_card_issued_date: null,
@@ -156,7 +222,13 @@ export async function createStudent(studentData, initialPayment = null) {
       .select()
       .single();
 
-    if (studentError) throw studentError;
+    if (studentError) {
+      // Check for Postgres unique constraint violation as well
+      if (studentError.code === '23505' || studentError.message?.toLowerCase().includes('unique')) {
+        throw new Error(`A student with CNIC "${formattedCnic}" is already enrolled. Duplicate CNIC is not permitted.`);
+      }
+      throw studentError;
+    }
 
     // 2. If initial payment provided and > 0, record payment transaction
     if (initialPayment && Number(initialPayment.amount) > 0) {
@@ -201,30 +273,48 @@ export async function createStudent(studentData, initialPayment = null) {
  */
 export async function updateStudent(id, studentData) {
   try {
+    const rawCnic = studentData.student_cnic ? studentData.student_cnic.trim() : '';
+    const formattedCnic = rawCnic ? formatCNIC(rawCnic) : null;
+
+    if (formattedCnic) {
+      if (!isValidCNIC(formattedCnic)) {
+        throw new Error('Student CNIC must follow the required format: XXXXX-XXXXXXX-X.');
+      }
+      const duplicate = await checkDuplicateStudentCnic(formattedCnic, id);
+      if (duplicate) {
+        throw new Error(`Another student is already enrolled with CNIC "${formattedCnic}" (${duplicate.student_name}).`);
+      }
+    }
+
     const { data, error } = await supabase
       .from('students')
       .update({
-        student_name: studentData.student_name,
-        father_name: studentData.father_name,
-        date_of_birth: studentData.date_of_birth,
-        student_cnic: studentData.student_cnic,
-        father_cnic: studentData.father_cnic,
+        student_name: studentData.student_name?.trim(),
+        father_name: studentData.father_name?.trim(),
+        date_of_birth: studentData.date_of_birth || null,
+        student_cnic: formattedCnic,
+        father_cnic: studentData.father_cnic ? formatCNIC(studentData.father_cnic) : null,
         gender: studentData.gender,
-        contact_number: studentData.contact_number,
-        reference: studentData.reference,
+        contact_number: studentData.contact_number || null,
+        reference: studentData.reference || null,
         admission_session: studentData.admission_session,
         admission_type: studentData.admission_type,
         program_group: studentData.program_group,
         academic_class: studentData.academic_class,
         total_fee: Number(studentData.total_fee) || 0,
-        next_payment_due_date: studentData.next_payment_due_date,
+        next_payment_due_date: studentData.next_payment_due_date || null,
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      if (error.code === '23505' || error.message?.toLowerCase().includes('unique')) {
+        throw new Error(`Another student is already enrolled with CNIC "${formattedCnic}". Duplicate CNIC is not permitted.`);
+      }
+      throw error;
+    }
     return data;
   } catch (err) {
     console.error('updateStudent error:', err);

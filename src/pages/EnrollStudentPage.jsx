@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UserPlus, User, BookOpen, DollarSign, Calendar, AlertCircle, CheckCircle2, ArrowLeft, CreditCard } from 'lucide-react';
-import { createStudent } from '../services/studentService';
+import { UserPlus, User, BookOpen, DollarSign, Calendar, AlertCircle, CheckCircle2, ArrowLeft, CreditCard, ShieldAlert } from 'lucide-react';
+import { createStudent, checkDuplicateStudentCnic } from '../services/studentService';
 import { getAdmissionConfig } from '../services/configService';
 import { calculateDues, formatCurrency } from '../utils/feeCalculator';
+import { formatCNIC, isValidCNIC } from '../utils/cnicHelper';
 
 export function EnrollStudentPage() {
   const navigate = useNavigate();
@@ -11,6 +12,8 @@ export function EnrollStudentPage() {
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [cnicChecking, setCnicChecking] = useState(false);
+  const [cnicDuplicateError, setCnicDuplicateError] = useState('');
 
   // Form fields
   const [formData, setFormData] = useState({
@@ -71,6 +74,41 @@ export function EnrollStudentPage() {
     }));
   };
 
+  // CNIC input handler with auto-hyphenation (XXXXX-XXXXXXX-X)
+  const handleStudentCnicChange = (e) => {
+    const formatted = formatCNIC(e.target.value);
+    setFormData(prev => ({ ...prev, student_cnic: formatted }));
+    setCnicDuplicateError('');
+    if (formError && formError.toLowerCase().includes('cnic')) {
+      setFormError('');
+    }
+  };
+
+  // Check duplicate on blur if valid CNIC pattern
+  const handleStudentCnicBlur = async () => {
+    const cnic = formData.student_cnic.trim();
+    if (!cnic) return;
+
+    if (!isValidCNIC(cnic)) {
+      setCnicDuplicateError('Invalid CNIC format. Required pattern: XXXXX-XXXXXXX-X (13 digits)');
+      return;
+    }
+
+    try {
+      setCnicChecking(true);
+      const existing = await checkDuplicateStudentCnic(cnic);
+      if (existing) {
+        setCnicDuplicateError(`A student is already enrolled with this CNIC (${existing.student_name} S/O ${existing.father_name} - Class: ${existing.academic_class}). Duplicate CNIC is not allowed.`);
+      } else {
+        setCnicDuplicateError('');
+      }
+    } catch (err) {
+      console.warn('CNIC duplicate check error:', err);
+    } finally {
+      setCnicChecking(false);
+    }
+  };
+
   // Financial calculations
   const totalFeeNum = Number(formData.total_fee) || 0;
   const initialPaidNum = Number(formData.initial_payment) || 0;
@@ -80,33 +118,55 @@ export function EnrollStudentPage() {
     e.preventDefault();
     setFormError('');
 
-    // Validations (Sections 34 & 35 of AGENTS.md)
-    if (!formData.student_name.trim()) {
+    // 1. Strict Validation of All 9 Required Fields
+    const trimmedName = formData.student_name.trim();
+    const trimmedFatherName = formData.father_name.trim();
+    const gender = formData.gender?.trim();
+    const trimmedCnic = formData.student_cnic.trim();
+    const session = formData.admission_session?.trim();
+    const type = formData.admission_type?.trim();
+    const program = formData.program_group?.trim();
+    const academicClass = formData.academic_class?.trim();
+    const rawTotalFee = formData.total_fee;
+
+    if (!trimmedName) {
       setFormError('Student Name is required.');
       return;
     }
-    if (!formData.father_name.trim()) {
+    if (!trimmedFatherName) {
       setFormError('Father Name is required.');
       return;
     }
-    if (!formData.admission_session) {
+    if (!gender) {
+      setFormError('Gender is required.');
+      return;
+    }
+    if (!trimmedCnic) {
+      setFormError('Student CNIC is required.');
+      return;
+    }
+    if (!isValidCNIC(trimmedCnic)) {
+      setFormError('Student CNIC must match the required pattern: XXXXX-XXXXXXX-X (13 digits).');
+      return;
+    }
+    if (!session) {
       setFormError('Admission Session is required.');
       return;
     }
-    if (!formData.admission_type) {
+    if (!type) {
       setFormError('Admission Type is required.');
       return;
     }
-    if (!formData.program_group) {
+    if (!program) {
       setFormError('Program / Group is required.');
       return;
     }
-    if (!formData.academic_class) {
+    if (!academicClass) {
       setFormError('Academic Class is required.');
       return;
     }
-    if (totalFeeNum < 0) {
-      setFormError('Total Fee cannot be negative.');
+    if (rawTotalFee === '' || rawTotalFee === null || isNaN(Number(rawTotalFee)) || Number(rawTotalFee) < 0) {
+      setFormError('Total Fee is required and cannot be negative.');
       return;
     }
     if (initialPaidNum < 0) {
@@ -120,20 +180,29 @@ export function EnrollStudentPage() {
 
     try {
       setIsSubmitting(true);
+
+      // Pre-check duplicate CNIC before submission
+      const existing = await checkDuplicateStudentCnic(trimmedCnic);
+      if (existing) {
+        setFormError(`A student is already enrolled with CNIC "${trimmedCnic}" (${existing.student_name} S/O ${existing.father_name}). Duplicate CNIC is not permitted.`);
+        setCnicDuplicateError(`Duplicate CNIC! Already enrolled: ${existing.student_name} (${existing.academic_class})`);
+        return;
+      }
+
       const student = await createStudent(
         {
-          student_name: formData.student_name.trim(),
-          father_name: formData.father_name.trim(),
+          student_name: trimmedName,
+          father_name: trimmedFatherName,
           date_of_birth: formData.date_of_birth || null,
-          student_cnic: formData.student_cnic.trim() || null,
-          father_cnic: formData.father_cnic.trim() || null,
-          gender: formData.gender,
+          student_cnic: trimmedCnic,
+          father_cnic: formData.father_cnic.trim() ? formatCNIC(formData.father_cnic) : null,
+          gender: gender,
           contact_number: formData.contact_number.trim() || null,
           reference: formData.reference.trim() || null,
-          admission_session: formData.admission_session,
-          admission_type: formData.admission_type,
-          program_group: formData.program_group,
-          academic_class: formData.academic_class,
+          admission_session: session,
+          admission_type: type,
+          program_group: program,
+          academic_class: academicClass,
           total_fee: totalFeeNum,
           next_payment_due_date: duesNum > 0 ? formData.next_payment_due_date || null : null
         },
@@ -158,6 +227,7 @@ export function EnrollStudentPage() {
 
   const currentProgramList = config?.programGroups?.[formData.admission_type] || [];
   const currentClassList = config?.academicClasses?.[formData.admission_type] || [];
+  const isCnicValidFormat = isValidCNIC(formData.student_cnic);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -179,9 +249,12 @@ export function EnrollStudentPage() {
       </div>
 
       {formError && (
-        <div className="p-4 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-300 text-sm flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 shrink-0" />
-          <span>{formError}</span>
+        <div className="p-4 rounded-xl bg-rose-950/70 border border-rose-500/50 text-rose-300 text-sm flex items-start gap-3 shadow-lg">
+          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-rose-400" />
+          <div>
+            <div className="font-bold text-rose-200">Validation Error</div>
+            <div className="text-xs text-rose-300/90 mt-0.5">{formError}</div>
+          </div>
         </div>
       )}
 
@@ -224,6 +297,73 @@ export function EnrollStudentPage() {
               />
             </div>
 
+            {/* Gender */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                Gender <span className="text-rose-400">*</span>
+              </label>
+              <select
+                required
+                value={formData.gender}
+                onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:border-teal-500 font-medium"
+              >
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            {/* Student CNIC / B-Form */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-slate-300">
+                  Student CNIC / B-Form <span className="text-rose-400">*</span>
+                </label>
+                <span className="text-[10px] font-mono text-slate-400">Pattern: XXXXX-XXXXXXX-X</span>
+              </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  required
+                  maxLength={15}
+                  placeholder="42101-1234567-1"
+                  value={formData.student_cnic}
+                  onChange={handleStudentCnicChange}
+                  onBlur={handleStudentCnicBlur}
+                  className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border text-white placeholder-slate-500 text-sm font-mono focus:outline-none transition-colors ${
+                    cnicDuplicateError
+                      ? 'border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/50'
+                      : isCnicValidFormat
+                      ? 'border-emerald-500/70 focus:border-emerald-500'
+                      : 'border-slate-700 focus:border-teal-500'
+                  }`}
+                />
+                {cnicChecking && (
+                  <span className="absolute right-3 top-3 text-[10px] text-teal-400 animate-pulse">Checking...</span>
+                )}
+                {!cnicChecking && isCnicValidFormat && !cnicDuplicateError && (
+                  <CheckCircle2 className="w-4 h-4 absolute right-3 top-3 text-emerald-400" />
+                )}
+              </div>
+
+              {/* CNIC Feedback */}
+              {cnicDuplicateError ? (
+                <div className="mt-1.5 text-[11px] text-rose-400 flex items-center gap-1.5">
+                  <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
+                  <span>{cnicDuplicateError}</span>
+                </div>
+              ) : formData.student_cnic && !isCnicValidFormat ? (
+                <span className="text-[10px] text-amber-400/90 mt-1 block">
+                  Format: 5 digits - 7 digits - 1 digit (13 numbers total)
+                </span>
+              ) : isCnicValidFormat ? (
+                <span className="text-[10px] text-emerald-400/90 mt-1 block">
+                  ✓ Valid CNIC format • Unique student identity
+                </span>
+              ) : null}
+            </div>
+
             {/* Date of Birth */}
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1.5">
@@ -237,53 +377,24 @@ export function EnrollStudentPage() {
               />
             </div>
 
-            {/* Gender */}
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                Gender
-              </label>
-              <select
-                value={formData.gender}
-                onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:border-teal-500"
-              >
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-
-            {/* Student CNIC / B-Form */}
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                Student CNIC / B-Form
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. 42101-1234567-1"
-                value={formData.student_cnic}
-                onChange={(e) => setFormData({ ...formData, student_cnic: e.target.value })}
-                className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-teal-500"
-              />
-            </div>
-
             {/* Father CNIC */}
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                Father CNIC
+                Father CNIC (Optional)
               </label>
               <input
                 type="text"
-                placeholder="e.g. 42101-7654321-1"
+                maxLength={15}
+                placeholder="42101-7654321-1"
                 value={formData.father_cnic}
-                onChange={(e) => setFormData({ ...formData, father_cnic: e.target.value })}
-                className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-teal-500"
+                onChange={(e) => setFormData({ ...formData, father_cnic: formatCNIC(e.target.value) })}
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-sm font-mono focus:outline-none focus:border-teal-500"
               />
             </div>
 
             {/* Contact Number */}
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+              <label className="block text-xs font-medium text-slate-300 mb-1.5">
                 Contact Number (WhatsApp)
               </label>
               <input
@@ -513,8 +624,8 @@ export function EnrollStudentPage() {
 
           <button
             type="submit"
-            disabled={isSubmitting}
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-sm font-bold shadow-lg shadow-teal-600/30 transition-all active:scale-[0.98] disabled:opacity-50"
+            disabled={isSubmitting || !!cnicDuplicateError}
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-sm font-bold shadow-lg shadow-teal-600/30 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <UserPlus className="w-4 h-4" />
             <span>{isSubmitting ? 'Saving Enrollment...' : 'Enroll & Save Student'}</span>

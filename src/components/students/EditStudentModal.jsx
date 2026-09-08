@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { X, UserCheck, AlertCircle, DollarSign, Calendar, BookOpen, User } from 'lucide-react';
-import { updateStudent } from '../../services/studentService';
+import { updateStudent, checkDuplicateStudentCnic } from '../../services/studentService';
 import { getAdmissionConfig } from '../../services/configService';
 import { formatCurrency } from '../../utils/feeCalculator';
+import { formatCNIC, isValidCNIC } from '../../utils/cnicHelper';
 
 export function EditStudentModal({ isOpen, onClose, student, onStudentUpdated }) {
   if (!isOpen || !student) return null;
@@ -59,9 +60,20 @@ export function EditStudentModal({ isOpen, onClose, student, onStudentUpdated })
 
     const totalFeeNum = Number(formData.total_fee) || 0;
     const totalPaidNum = Number(student.total_paid) || 0;
+    const rawCnic = formData.student_cnic?.trim();
 
     if (!formData.student_name.trim() || !formData.father_name.trim()) {
       setError('Student Name and Father Name are required.');
+      return;
+    }
+
+    if (!rawCnic) {
+      setError('Student CNIC is required.');
+      return;
+    }
+
+    if (!isValidCNIC(rawCnic)) {
+      setError('Student CNIC must match the required pattern: XXXXX-XXXXXXX-X (13 digits).');
       return;
     }
 
@@ -76,8 +88,8 @@ export function EditStudentModal({ isOpen, onClose, student, onStudentUpdated })
         student_name: formData.student_name.trim(),
         father_name: formData.father_name.trim(),
         date_of_birth: formData.date_of_birth || null,
-        student_cnic: formData.student_cnic.trim() || null,
-        father_cnic: formData.father_cnic.trim() || null,
+        student_cnic: rawCnic,
+        father_cnic: formData.father_cnic.trim() ? formatCNIC(formData.father_cnic) : null,
         gender: formData.gender,
         contact_number: formData.contact_number.trim() || null,
         reference: formData.reference.trim() || null,
@@ -177,11 +189,26 @@ export function EditStudentModal({ isOpen, onClose, student, onStudentUpdated })
               </div>
 
               <div>
-                <label className="block text-slate-300 mb-1">Student CNIC / B-Form</label>
+                <label className="block text-slate-300 mb-1 font-medium">Student CNIC / B-Form *</label>
                 <input
                   type="text"
+                  required
+                  maxLength={15}
+                  placeholder="42101-1234567-1"
                   value={formData.student_cnic}
-                  onChange={(e) => setFormData({ ...formData, student_cnic: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, student_cnic: formatCNIC(e.target.value) })}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-teal-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 mb-1">Father CNIC (Optional)</label>
+                <input
+                  type="text"
+                  maxLength={15}
+                  placeholder="42101-7654321-1"
+                  value={formData.father_cnic}
+                  onChange={(e) => setFormData({ ...formData, father_cnic: formatCNIC(e.target.value) })}
                   className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-teal-500 font-mono"
                 />
               </div>
