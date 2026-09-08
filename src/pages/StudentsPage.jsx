@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Search, Plus, FileText, CreditCard, ArrowRight, AlertTriangle, ShieldCheck, Download, Trash2, Edit3, Phone, RefreshCw } from 'lucide-react';
+import { Users, Search, Plus, FileText, CreditCard, ArrowRight, AlertTriangle, ShieldCheck, Download, Trash2, Edit3, Phone, RefreshCw, BellRing } from 'lucide-react';
 import { getStudents, deleteStudent } from '../services/studentService';
 import { getAdmissionConfig } from '../services/configService';
 import { StatusBadge } from '../components/common/StatusBadge';
@@ -9,6 +9,7 @@ import { FeeSlipModal } from '../components/fee-slip/FeeSlipModal';
 import { AddPaymentModal } from '../components/payments/AddPaymentModal';
 import { ManageProgressModal } from '../components/progress/ManageProgressModal';
 import { EditStudentModal } from '../components/students/EditStudentModal';
+import { FeeDueNoticeModal } from '../components/notices/FeeDueNoticeModal';
 import { formatCurrency, formatDate } from '../utils/feeCalculator';
 import { exportStudentsToCSV } from '../utils/csvExport';
 
@@ -24,6 +25,7 @@ export function StudentsPage() {
   const [feeStatus, setFeeStatus] = useState('All');
 
   const [selectedStudentForSlip, setSelectedStudentForSlip] = useState(null);
+  const [selectedStudentForNotice, setSelectedStudentForNotice] = useState(null);
   const [selectedStudentForPayment, setSelectedStudentForPayment] = useState(null);
   const [selectedStudentForProgress, setSelectedStudentForProgress] = useState(null);
   const [selectedStudentForEdit, setSelectedStudentForEdit] = useState(null);
@@ -419,13 +421,23 @@ export function StudentsPage() {
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           {student.dues > 0 && (
-                            <button
-                              onClick={() => setSelectedStudentForPayment(student)}
-                              title="Record Payment"
-                              className="p-1.5 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 transition-colors"
-                            >
-                              <CreditCard className="w-3.5 h-3.5" />
-                            </button>
+                            <>
+                              <button
+                                onClick={() => setSelectedStudentForPayment(student)}
+                                title="Record Payment"
+                                className="p-1.5 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 transition-colors"
+                              >
+                                <CreditCard className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                onClick={() => setSelectedStudentForNotice(student)}
+                                title="Generate Fee Due Notice & Reminder"
+                                className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 transition-colors"
+                              >
+                                <BellRing className="w-3.5 h-3.5" />
+                              </button>
+                            </>
                           )}
 
                           <button
@@ -485,6 +497,16 @@ export function StudentsPage() {
           onClose={() => setSelectedStudentForSlip(null)}
           student={selectedStudentForSlip}
           latestPayment={selectedStudentForSlip.payments?.[selectedStudentForSlip.payments.length - 1]}
+        />
+      )}
+
+      {/* Fee Due Notice Modal */}
+      {selectedStudentForNotice && (
+        <FeeDueNoticeModal
+          isOpen={!!selectedStudentForNotice}
+          onClose={() => setSelectedStudentForNotice(null)}
+          student={selectedStudentForNotice}
+          onNoticeCreated={() => loadData()}
         />
       )}
 

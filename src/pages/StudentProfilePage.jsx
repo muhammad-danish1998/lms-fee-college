@@ -3,17 +3,20 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   User, BookOpen, DollarSign, Calendar, CreditCard, FileText,
   Share2, Printer, Plus, Trash2, ArrowLeft, CheckCircle2,
-  AlertTriangle, Phone, ShieldCheck, Clock, UserCheck, CalendarClock, History, Edit3
+  AlertTriangle, Phone, ShieldCheck, Clock, UserCheck, CalendarClock, History, Edit3, BellRing
 } from 'lucide-react';
 import { getStudentById, updateStudentProgress, deleteStudent } from '../services/studentService';
 import { deletePayment } from '../services/paymentService';
 import { getCommitmentsByStudentId } from '../services/commitmentService';
+import { getNoticesByStudentId } from '../services/noticeService';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { ProgressTracker } from '../components/progress/ProgressTracker';
 import { FeeSlipModal } from '../components/fee-slip/FeeSlipModal';
 import { AddPaymentModal } from '../components/payments/AddPaymentModal';
 import { SetCommitmentModal } from '../components/commitments/SetCommitmentModal';
 import { EditStudentModal } from '../components/students/EditStudentModal';
+import { FeeDueNoticeModal } from '../components/notices/FeeDueNoticeModal';
+import { NoticeHistoryList } from '../components/notices/NoticeHistoryList';
 import { formatCurrency, formatDate } from '../utils/feeCalculator';
 
 export function StudentProfilePage() {
@@ -22,11 +25,13 @@ export function StudentProfilePage() {
 
   const [student, setStudent] = useState(null);
   const [commitments, setCommitments] = useState([]);
+  const [notices, setNotices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   // Modals state
   const [showFeeSlip, setShowFeeSlip] = useState(false);
+  const [showFeeDueNotice, setShowFeeDueNotice] = useState(false);
   const [showAddPayment, setShowAddPayment] = useState(false);
   const [showSetCommitment, setShowSetCommitment] = useState(false);
   const [showEditStudent, setShowEditStudent] = useState(false);
@@ -36,9 +41,10 @@ export function StudentProfilePage() {
     try {
       setLoading(true);
       setError('');
-      const [data, commitmentList] = await Promise.all([
+      const [data, commitmentList, noticeList] = await Promise.all([
         getStudentById(id),
-        getCommitmentsByStudentId(id)
+        getCommitmentsByStudentId(id),
+        getNoticesByStudentId(id)
       ]);
 
       if (!data) {
@@ -46,6 +52,7 @@ export function StudentProfilePage() {
       } else {
         setStudent(data);
         setCommitments(commitmentList);
+        setNotices(noticeList || []);
       }
     } catch (err) {
       console.error('Error fetching student:', err);
@@ -185,6 +192,14 @@ export function StudentProfilePage() {
               >
                 <CalendarClock className="w-3.5 h-3.5" />
                 <span>Set / Extend Commitment</span>
+              </button>
+
+              <button
+                onClick={() => setShowFeeDueNotice(true)}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs font-semibold border border-amber-500/30 transition-colors"
+              >
+                <BellRing className="w-3.5 h-3.5 text-amber-400" />
+                <span>Fee Due Notice</span>
               </button>
             </>
           )}
@@ -458,6 +473,31 @@ export function StudentProfilePage() {
               </div>
             )}
           </div>
+
+          {/* Section: Fee Due Notices & Reminders History */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+              <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+                <BellRing className="w-4 h-4" />
+                <span>Fee Due Notices &amp; Reminders ({notices.length})</span>
+              </div>
+              {student.dues > 0 && (
+                <button
+                  onClick={() => setShowFeeDueNotice(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs font-semibold border border-amber-500/30 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Issue New Notice</span>
+                </button>
+              )}
+            </div>
+
+            <NoticeHistoryList
+              student={student}
+              notices={notices}
+              onReload={() => loadStudent()}
+            />
+          </div>
         </div>
 
         {/* Right 1 Column: Fee Summary Card */}
@@ -519,6 +559,16 @@ export function StudentProfilePage() {
 
             {/* Print & Share Actions */}
             <div className="pt-3 border-t border-slate-800 space-y-2">
+              {student.dues > 0 && (
+                <button
+                  onClick={() => setShowFeeDueNotice(true)}
+                  className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs font-semibold border border-amber-500/30 transition-colors"
+                >
+                  <BellRing className="w-4 h-4 text-amber-400" />
+                  <span>Fee Due Reminder Notice</span>
+                </button>
+              )}
+
               <button
                 onClick={() => {
                   setSelectedSlipPayment(student.payments?.[student.payments.length - 1] || null);
@@ -552,6 +602,16 @@ export function StudentProfilePage() {
           }}
           student={student}
           latestPayment={selectedSlipPayment}
+        />
+      )}
+
+      {/* Fee Due Notice Modal */}
+      {showFeeDueNotice && (
+        <FeeDueNoticeModal
+          isOpen={showFeeDueNotice}
+          onClose={() => setShowFeeDueNotice(false)}
+          student={student}
+          onNoticeCreated={() => loadStudent()}
         />
       )}
 
