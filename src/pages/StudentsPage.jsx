@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Search, Plus, FileText, CreditCard, ArrowRight, AlertTriangle, ShieldCheck, Download, Trash2, Edit3, Phone } from 'lucide-react';
+import { Users, Search, Plus, FileText, CreditCard, ArrowRight, AlertTriangle, ShieldCheck, Download, Trash2, Edit3, Phone, RefreshCw } from 'lucide-react';
 import { getStudents, deleteStudent } from '../services/studentService';
 import { getAdmissionConfig } from '../services/configService';
 import { StatusBadge } from '../components/common/StatusBadge';
@@ -69,13 +69,23 @@ export function StudentsPage() {
         <div>
           <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">Student Directory</h2>
           <p className="text-xs md:text-sm text-slate-400">
-            Search, filter, edit, and inspect student records, fee status, and verification progress
+            Search, filter, view fee statuses and manage student records
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
           <button
-            onClick={() => exportStudentsToCSV(students, `JMT_Students_${new Date().toISOString().split('T')[0]}.csv`)}
-            title="Download filtered student records as CSV"
+            onClick={() => loadData()}
+            disabled={loading}
+            title="Refresh student records"
+            className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 text-xs sm:text-sm font-semibold border border-slate-700 transition-colors active:scale-[0.98]"
+          >
+            <RefreshCw className={`w-4 h-4 text-teal-400 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden xs:inline">Refresh</span>
+          </button>
+
+          <button
+            onClick={() => exportStudentsToCSV(students, `JMT_Students_Directory_${new Date().toISOString().split('T')[0]}.csv`)}
+            title="Download full fee ledger and student directory as CSV"
             className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-semibold border border-slate-700 transition-colors"
           >
             <Download className="w-4 h-4 text-teal-400" />
