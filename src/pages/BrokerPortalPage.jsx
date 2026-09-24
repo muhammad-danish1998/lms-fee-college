@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { getBrokerPortalDataByRpc } from '../services/brokerService';
 import { formatCurrency, formatDate } from '../utils/feeCalculator';
+import { printBrokerStatement } from '../utils/printBrokerStatement';
 
 export function BrokerPortalPage() {
   const { token } = useParams();
@@ -78,7 +79,13 @@ export function BrokerPortalPage() {
   };
 
   const handlePrint = () => {
-    window.print();
+    if (!portalData || !portalData.broker) return;
+    printBrokerStatement({
+      broker: portalData.broker,
+      students: filteredStudents,
+      sessionFilter: sessionFilter,
+      progressFilter: progressFilter,
+    });
   };
 
   // Filter students
@@ -239,10 +246,10 @@ export function BrokerPortalPage() {
           <div className="flex items-center gap-2.5 shrink-0 print:hidden">
             <button
               onClick={handlePrint}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition-colors shadow-sm"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer"
             >
-              <Printer className="w-4 h-4 text-teal-400" />
-              <span>Print Statement</span>
+              <Printer className="w-4 h-4" />
+              <span>Print / Save PDF</span>
             </button>
 
             <button
