@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, UserCheck, AlertCircle, DollarSign, Calendar, BookOpen, User, Handshake, Info } from 'lucide-react';
+import { X, UserCheck, AlertCircle, DollarSign, Calendar, BookOpen, User, Handshake, Info, Calculator } from 'lucide-react';
 import { updateStudent, checkDuplicateStudentCnic } from '../../services/studentService';
+import { adjustStudentPaidAmount } from '../../services/paymentService';
 import { getAdmissionConfig } from '../../services/configService';
 import { getActiveBrokers } from '../../services/brokerService';
 import { formatCurrency } from '../../utils/feeCalculator';
@@ -31,6 +32,7 @@ export function EditStudentModal({ isOpen, onClose, student, onStudentUpdated })
     program_group: student.program_group || '',
     academic_class: student.academic_class || '',
     total_fee: student.total_fee || 0,
+    paid_amount: student.total_paid !== undefined ? String(student.total_paid) : '0',
     next_payment_due_date: student.next_payment_due_date || '',
     commitment_notes: student.commitment_notes || ''
   });
@@ -69,7 +71,7 @@ export function EditStudentModal({ isOpen, onClose, student, onStudentUpdated })
     setError('');
 
     const totalFeeNum = Number(formData.total_fee) || 0;
-    const totalPaidNum = Number(student.total_paid) || 0;
+    const paidNum = Number(formData.paid_amount) >= 0 ? Number(formData.paid_amount) : 0;
     const rawCnic = formData.student_cnic?.trim();
 
     if (!formData.student_name.trim() || !formData.father_name.trim()) {
@@ -87,8 +89,8 @@ export function EditStudentModal({ isOpen, onClose, student, onStudentUpdated })
       return;
     }
 
-    if (totalFeeNum < totalPaidNum) {
-      setError(`Total Fee cannot be less than cumulative total paid (${formatCurrency(totalPaidNum)}).`);
+    if (paidNum > totalFeeNum) {
+      setError(`Paid amount (${formatCurrency(paidNum)}) cannot exceed Total Fee (${formatCurrency(totalFeeNum)}).`);
       return;
     }
 
@@ -114,6 +116,10 @@ export function EditStudentModal({ isOpen, onClose, student, onStudentUpdated })
         commitment_notes: formData.commitment_notes?.trim() || null,
         next_payment_due_date: formData.next_payment_due_date || null
       });
+
+      if (paidNum !== Number(student.total_paid || 0)) {
+        await adjustStudentPaidAmount(student.id, paidNum, 'Profile Edit Fee Adjustment');
+      }
 
       if (onStudentUpdated) {
         onStudentUpdated();
@@ -398,8 +404,20 @@ export function EditStudentModal({ isOpen, onClose, student, onStudentUpdated })
                   onChange={(e) => setFormData({ ...formData, total_fee: e.target.value })}
                   className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono font-bold focus:outline-none focus:border-teal-500"
                 />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 mb-1 font-medium">Recorded Paid (PKR)</label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  value={formData.paid_amount}
+                  onChange={(e) => setFormData({ ...formData, paid_amount: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-emerald-400 font-mono font-bold focus:outline-none focus:border-emerald-500"
+                />
                 <span className="text-[10px] text-slate-400 mt-1 block">
-                  Paid to Date: <span className="text-emerald-400 font-bold">{formatCurrency(student.total_paid)}</span>
+                  Calculated Dues: <span className="text-amber-400 font-bold">{formatCurrency(Math.max(0, (Number(formData.total_fee) || 0) - (Number(formData.paid_amount) || 0)))}</span>
                 </span>
               </div>
 
@@ -413,13 +431,13 @@ export function EditStudentModal({ isOpen, onClose, student, onStudentUpdated })
                 />
               </div>
 
-              <div className="sm:col-span-2">
+              <div>
                 <label className="block text-slate-300 mb-1 font-medium">
                   Milestone / Stage Condition (Optional)
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. On Enrollment Card Issuance / On Examination in Verification"
+                  placeholder="e.g. On Enrollment Card Issuance"
                   value={formData.commitment_notes}
                   onChange={(e) => setFormData({ ...formData, commitment_notes: e.target.value })}
                   className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 text-xs"

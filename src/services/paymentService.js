@@ -88,3 +88,85 @@ export async function deletePayment(paymentId) {
     throw err;
   }
 }
+
+/**
+ * Adjust/rebalance a student's total recorded payment transactions to match a target paid amount
+ * (e.g., when restructuring fees during a broker referral transfer or retroactive correction).
+ */
+export async function adjustStudentPaidAmount(studentId, targetPaidAmount, reason = 'Adjustment on fee restructuring') {
+  try {
+    const targetAmount = Math.max(0, Math.round(Number(targetPaidAmount) || 0));
+
+    // Fetch existing payments
+    const { data: existingPayments, error: fetchErr } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('payment_date', { ascending: true });
+
+    if (fetchErr) throw fetchErr;
+
+    const currentTotal = (existingPayments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+    // If already equal, do nothing
+    if (currentTotal === targetAmount) {
+      return true;
+    }
+
+    if (targetAmount === 0) {
+      // Delete all existing payments for this student
+      const { error: delErr } = await supabase
+        .from('payments')
+        .delete()
+        .eq('student_id', studentId);
+
+      if (delErr) throw delErr;
+      return true;
+    }
+
+    if (existingPayments && existingPayments.length === 1) {
+      // Just update the existing single payment record
+      const { error: updateErr } = await supabase
+        .from('payments')
+        .update({
+          amount: targetAmount,
+          notes: existingPayments[0].notes
+            ? `${existingPayments[0].notes} | Adjusted: ${reason}`
+            : `Payment Adjusted: ${reason}`
+        })
+        .eq('id', existingPayments[0].id);
+
+      if (updateErr) throw updateErr;
+      return true;
+    }
+
+    // If multiple payments or no prior payments, replace with one consolidated/adjusted payment record
+    if (existingPayments && existingPayments.length > 0) {
+      const { error: delErr } = await supabase
+        .from('payments')
+        .delete()
+        .eq('student_id', studentId);
+
+      if (delErr) throw delErr;
+    }
+
+    const receiptNo = `RCP-${Date.now().toString().slice(-6)}`;
+    const { error: insertErr } = await supabase
+      .from('payments')
+      .insert([{
+        student_id: studentId,
+        amount: targetAmount,
+        payment_date: new Date().toISOString().split('T')[0],
+        payment_method: 'Cash',
+        receipt_no: receiptNo,
+        notes: `Adjusted Payment Record: ${reason}`
+      }]);
+
+    if (insertErr) throw insertErr;
+    return true;
+  } catch (err) {
+    console.error('adjustStudentPaidAmount error:', err);
+    throw err;
+  }
+}
+
