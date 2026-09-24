@@ -16,6 +16,7 @@ import { FeeSlipModal } from '../components/fee-slip/FeeSlipModal';
 import { AddPaymentModal } from '../components/payments/AddPaymentModal';
 import { SetCommitmentModal } from '../components/commitments/SetCommitmentModal';
 import { EditStudentModal } from '../components/students/EditStudentModal';
+import { AssignBrokerModal } from '../components/brokers/AssignBrokerModal';
 import { FeeDueNoticeModal } from '../components/notices/FeeDueNoticeModal';
 import { NoticeHistoryList } from '../components/notices/NoticeHistoryList';
 import { formatCurrency, formatDate } from '../utils/feeCalculator';
@@ -37,6 +38,7 @@ export function StudentProfilePage() {
   const [showAddPayment, setShowAddPayment] = useState(false);
   const [showSetCommitment, setShowSetCommitment] = useState(false);
   const [showEditStudent, setShowEditStudent] = useState(false);
+  const [showAssignBroker, setShowAssignBroker] = useState(false);
   const [selectedSlipPayment, setSelectedSlipPayment] = useState(null);
 
   const loadStudent = async () => {
@@ -227,6 +229,15 @@ export function StudentProfilePage() {
           </button>
 
           <button
+            onClick={() => setShowAssignBroker(true)}
+            title={student.admission_source === 'Referral' ? 'Change or Reassign Referral Broker' : 'Assign to Referral Broker'}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 text-xs font-semibold border border-purple-500/30 transition-colors"
+          >
+            <Handshake className="w-3.5 h-3.5 text-purple-400" />
+            <span>{student.admission_source === 'Referral' ? 'Change Broker' : 'Assign Broker'}</span>
+          </button>
+
+          <button
             onClick={() => setShowEditStudent(true)}
             title="Edit Student Information & Fee"
             className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors"
@@ -316,7 +327,7 @@ export function StudentProfilePage() {
             </div>
 
             {/* Referral Broker Channel Info Banner if Referral */}
-            {student.admission_source === 'Referral' && (
+            {student.admission_source === 'Referral' ? (
               <div className="mt-4 p-3.5 rounded-xl bg-purple-950/40 border border-purple-500/30 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
                   <div className="p-2 rounded-lg bg-purple-500/20 text-purple-300">
@@ -330,12 +341,33 @@ export function StudentProfilePage() {
                   </div>
                 </div>
 
-                <div className="sm:text-right border-t sm:border-t-0 border-purple-500/20 pt-2 sm:pt-0">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Agreed Snapshot Amount</span>
-                  <span className="font-mono font-bold text-purple-300 text-sm">
-                    {formatCurrency(student.broker_agreed_amount || 0)}
-                  </span>
+                <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 border-purple-500/20 pt-2 sm:pt-0">
+                  <div className="sm:text-right">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Agreed Snapshot Amount</span>
+                    <span className="font-mono font-bold text-purple-300 text-sm">
+                      {formatCurrency(student.broker_agreed_amount || 0)}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setShowAssignBroker(true)}
+                    className="px-2.5 py-1.5 rounded-lg bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 text-[11px] font-semibold border border-purple-400/30 transition-colors"
+                  >
+                    Edit / Reassign
+                  </button>
                 </div>
+              </div>
+            ) : (
+              <div className="mt-4 p-3 rounded-xl bg-slate-950/50 border border-slate-800/80 text-xs flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-slate-400 text-xs">
+                  <span>Enrolled as Direct Student.</span>
+                </div>
+                <button
+                  onClick={() => setShowAssignBroker(true)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-purple-950/50 text-slate-300 hover:text-purple-300 text-[11px] font-semibold border border-slate-700 hover:border-purple-500/30 transition-all"
+                >
+                  <Handshake className="w-3 h-3 text-purple-400" />
+                  <span>Assign to Referral Partner</span>
+                </button>
               </div>
             )}
           </div>
@@ -685,6 +717,16 @@ export function StudentProfilePage() {
           onClose={() => setShowEditStudent(false)}
           student={student}
           onStudentUpdated={() => loadStudent()}
+        />
+      )}
+
+      {/* Quick Assign / Change Broker Modal */}
+      {showAssignBroker && (
+        <AssignBrokerModal
+          isOpen={showAssignBroker}
+          onClose={() => setShowAssignBroker(false)}
+          student={student}
+          onAssigned={() => loadStudent()}
         />
       )}
     </div>
