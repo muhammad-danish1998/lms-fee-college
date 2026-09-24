@@ -3,12 +3,13 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   User, BookOpen, DollarSign, Calendar, CreditCard, FileText,
   Share2, Printer, Plus, Trash2, ArrowLeft, CheckCircle2,
-  AlertTriangle, Phone, ShieldCheck, Clock, UserCheck, CalendarClock, History, Edit3, BellRing
+  AlertTriangle, Phone, ShieldCheck, Clock, UserCheck, CalendarClock, History, Edit3, BellRing, Handshake
 } from 'lucide-react';
 import { getStudentById, updateStudentProgress, deleteStudent } from '../services/studentService';
 import { deletePayment } from '../services/paymentService';
 import { getCommitmentsByStudentId } from '../services/commitmentService';
 import { getNoticesByStudentId } from '../services/noticeService';
+import { getBrokers } from '../services/brokerService';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { ProgressTracker } from '../components/progress/ProgressTracker';
 import { FeeSlipModal } from '../components/fee-slip/FeeSlipModal';
@@ -26,6 +27,7 @@ export function StudentProfilePage() {
   const [student, setStudent] = useState(null);
   const [commitments, setCommitments] = useState([]);
   const [notices, setNotices] = useState([]);
+  const [brokers, setBrokers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -41,10 +43,11 @@ export function StudentProfilePage() {
     try {
       setLoading(true);
       setError('');
-      const [data, commitmentList, noticeList] = await Promise.all([
+      const [data, commitmentList, noticeList, brokersList] = await Promise.all([
         getStudentById(id),
         getCommitmentsByStudentId(id),
-        getNoticesByStudentId(id)
+        getNoticesByStudentId(id),
+        getBrokers()
       ]);
 
       if (!data) {
@@ -53,6 +56,7 @@ export function StudentProfilePage() {
         setStudent(data);
         setCommitments(commitmentList);
         setNotices(noticeList || []);
+        setBrokers(brokersList || []);
       }
     } catch (err) {
       console.error('Error fetching student:', err);
@@ -156,9 +160,16 @@ export function StudentProfilePage() {
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Back to Students List</span>
           </button>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <h2 className="text-2xl font-extrabold text-white tracking-tight">{student.student_name}</h2>
             <StatusBadge status={student.fee_status} />
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+              student.admission_source === 'Referral'
+                ? 'bg-purple-950 text-purple-300 border border-purple-500/30'
+                : 'bg-slate-800 text-teal-300 border border-slate-700'
+            }`}>
+              {student.admission_source === 'Referral' ? '🤝 Referral Student' : 'Direct Student'}
+            </span>
             {student.commitment_status && student.commitment_status !== 'None' && (
               <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                 student.commitment_status === 'Fulfilled'
@@ -290,11 +301,43 @@ export function StudentProfilePage() {
                 <span className="text-slate-400 block text-[11px]">Contact Number</span>
                 <span className="font-mono text-slate-300 font-semibold">{student.contact_number || 'N/A'}</span>
               </div>
-              <div className="sm:col-span-2">
-                <span className="text-slate-400 block text-[11px]">Reference / Source</span>
+              <div>
+                <span className="text-slate-400 block text-[11px]">Admission Source</span>
+                <span className={`inline-block font-semibold mt-0.5 ${
+                  student.admission_source === 'Referral' ? 'text-purple-300' : 'text-teal-300'
+                }`}>
+                  {student.admission_source || 'Direct'}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[11px]">Reference / Remarks</span>
                 <span className="text-slate-300">{student.reference || 'Direct Admission'}</span>
               </div>
             </div>
+
+            {/* Referral Broker Channel Info Banner if Referral */}
+            {student.admission_source === 'Referral' && (
+              <div className="mt-4 p-3.5 rounded-xl bg-purple-950/40 border border-purple-500/30 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-purple-500/20 text-purple-300">
+                    <Handshake className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-purple-300/90 block">Referring Broker / Partner</span>
+                    <span className="font-bold text-white text-sm">
+                      {brokers.find(b => b.id === student.broker_id)?.name || 'Referral Partner'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="sm:text-right border-t sm:border-t-0 border-purple-500/20 pt-2 sm:pt-0">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Agreed Snapshot Amount</span>
+                  <span className="font-mono font-bold text-purple-300 text-sm">
+                    {formatCurrency(student.broker_agreed_amount || 0)}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Section: Admission Stream & Group */}

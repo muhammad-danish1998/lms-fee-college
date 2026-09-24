@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, UserCheck, AlertCircle, DollarSign, Calendar, BookOpen, User } from 'lucide-react';
+import { X, UserCheck, AlertCircle, DollarSign, Calendar, BookOpen, User, Handshake, Info } from 'lucide-react';
 import { updateStudent, checkDuplicateStudentCnic } from '../../services/studentService';
 import { getAdmissionConfig } from '../../services/configService';
+import { getActiveBrokers } from '../../services/brokerService';
 import { formatCurrency } from '../../utils/feeCalculator';
 import { formatCNIC, isValidCNIC } from '../../utils/cnicHelper';
 
@@ -9,6 +10,7 @@ export function EditStudentModal({ isOpen, onClose, student, onStudentUpdated })
   if (!isOpen || !student) return null;
 
   const [config, setConfig] = useState(null);
+  const [brokers, setBrokers] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -21,6 +23,9 @@ export function EditStudentModal({ isOpen, onClose, student, onStudentUpdated })
     gender: student.gender || 'Male',
     contact_number: student.contact_number || '',
     reference: student.reference || '',
+    admission_source: student.admission_source || 'Direct',
+    broker_id: student.broker_id || '',
+    broker_agreed_amount: student.broker_agreed_amount !== null && student.broker_agreed_amount !== undefined ? String(student.broker_agreed_amount) : '',
     admission_session: student.admission_session || 'Annual I',
     admission_type: student.admission_type || 'Regular',
     program_group: student.program_group || '',
@@ -31,15 +36,19 @@ export function EditStudentModal({ isOpen, onClose, student, onStudentUpdated })
   });
 
   useEffect(() => {
-    async function loadConfig() {
+    async function loadData() {
       try {
-        const data = await getAdmissionConfig();
-        setConfig(data);
+        const [configData, brokersData] = await Promise.all([
+          getAdmissionConfig(),
+          getActiveBrokers()
+        ]);
+        setConfig(configData);
+        setBrokers(brokersData || []);
       } catch (err) {
-        console.error('Failed to load config in EditStudentModal:', err);
+        console.error('Failed to load config or brokers in EditStudentModal:', err);
       }
     }
-    loadConfig();
+    loadData();
   }, []);
 
   const handleAdmissionTypeChange = (newType) => {
@@ -94,6 +103,9 @@ export function EditStudentModal({ isOpen, onClose, student, onStudentUpdated })
         gender: formData.gender,
         contact_number: formData.contact_number.trim() || null,
         reference: formData.reference.trim() || null,
+        admission_source: formData.admission_source,
+        broker_id: formData.admission_source === 'Referral' ? formData.broker_id : null,
+        broker_agreed_amount: formData.admission_source === 'Referral' ? (Number(formData.broker_agreed_amount) || 0) : null,
         admission_session: formData.admission_session,
         admission_type: formData.admission_type,
         program_group: formData.program_group,
@@ -113,6 +125,15 @@ export function EditStudentModal({ isOpen, onClose, student, onStudentUpdated })
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleBrokerChange = (brokerId) => {
+    const found = brokers.find(b => b.id === brokerId);
+    setFormData(prev => ({
+      ...prev,
+      broker_id: brokerId,
+      broker_agreed_amount: found ? String(found.current_agreed_amount || '') : prev.broker_agreed_amount
+    }));
   };
 
   const currentProgramList = config?.programGroups?.[formData.admission_type] || [];
@@ -143,6 +164,85 @@ export function EditStudentModal({ isOpen, onClose, student, onStudentUpdated })
               <span>{error}</span>
             </div>
           )}
+
+          {/* Admission Source Channel */}
+          <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-teal-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Handshake className="w-3.5 h-3.5" />
+                <span>Admission Source Channel</span>
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, admission_source: 'Direct' })}
+                className={`p-2.5 rounded-xl border font-semibold text-center transition-all ${
+                  formData.admission_source === 'Direct'
+                    ? 'bg-teal-500/20 text-teal-300 border-teal-500/60 shadow-sm'
+                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                }`}
+              >
+                Direct Student
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const defaultBrokerId = formData.broker_id || (brokers[0]?.id || '');
+                  const defaultBrokerAmount = formData.broker_agreed_amount || (brokers[0]?.current_agreed_amount ? String(brokers[0].current_agreed_amount) : '');
+                  setFormData({
+                    ...formData,
+                    admission_source: 'Referral',
+                    broker_id: defaultBrokerId,
+                    broker_agreed_amount: defaultBrokerAmount
+                  });
+                }}
+                className={`p-2.5 rounded-xl border font-semibold text-center transition-all ${
+                  formData.admission_source === 'Referral'
+                    ? 'bg-teal-500/20 text-teal-300 border-teal-500/60 shadow-sm'
+                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                }`}
+              >
+                Referral / Broker Student
+              </button>
+            </div>
+
+            {formData.admission_source === 'Referral' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-800">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                    Referring Broker
+                  </label>
+                  <select
+                    value={formData.broker_id}
+                    onChange={(e) => handleBrokerChange(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-teal-500 font-medium"
+                  >
+                    {brokers.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} (Standard: Rs. {Number(b.current_agreed_amount).toLocaleString()})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                    Snapshot Agreed Amount (PKR)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.broker_agreed_amount}
+                    onChange={(e) => setFormData({ ...formData, broker_agreed_amount: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-teal-500/40 text-teal-300 font-mono font-bold text-xs focus:outline-none focus:border-teal-400"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Personal Info */}
           <div>

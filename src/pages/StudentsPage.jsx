@@ -22,6 +22,7 @@ export function StudentsPage() {
   const [search, setSearch] = useState('');
   const [admissionType, setAdmissionType] = useState('All');
   const [admissionSession, setAdmissionSession] = useState('All');
+  const [admissionSource, setAdmissionSource] = useState('All');
   const [feeStatus, setFeeStatus] = useState('All');
 
   const [selectedStudentForSlip, setSelectedStudentForSlip] = useState(null);
@@ -35,7 +36,7 @@ export function StudentsPage() {
       setLoading(true);
       setError('');
       const [studentsData, configData] = await Promise.all([
-        getStudents({ search, admissionType, admissionSession, feeStatus }),
+        getStudents({ search, admissionType, admissionSession, feeStatus, admissionSource }),
         getAdmissionConfig()
       ]);
       setStudents(studentsData);
@@ -50,7 +51,7 @@ export function StudentsPage() {
 
   useEffect(() => {
     loadData();
-  }, [search, admissionType, admissionSession, feeStatus]);
+  }, [search, admissionType, admissionSession, feeStatus, admissionSource]);
 
   const handleDelete = async (id, name) => {
     if (!window.confirm(`Are you sure you want to permanently delete student "${name}"? All linked payment records will also be deleted.`)) {
@@ -108,7 +109,7 @@ export function StudentsPage() {
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 sm:p-4 shadow-sm space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2.5 sm:gap-3">
           {/* Search by Name */}
-          <div className="sm:col-span-2 lg:col-span-4 relative">
+          <div className="sm:col-span-2 lg:col-span-3 relative">
             <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
             <input
               type="text"
@@ -117,6 +118,19 @@ export function StudentsPage() {
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-xs sm:text-sm focus:outline-none focus:border-teal-500"
             />
+          </div>
+
+          {/* Admission Channel */}
+          <div className="lg:col-span-2">
+            <select
+              value={admissionSource}
+              onChange={(e) => setAdmissionSource(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-slate-200 text-xs sm:text-sm focus:outline-none focus:border-teal-500 font-medium"
+            >
+              <option value="All">All Channels</option>
+              <option value="Direct">Direct</option>
+              <option value="Referral">Referral</option>
+            </select>
           </div>
 
           {/* Admission Type */}
@@ -134,13 +148,13 @@ export function StudentsPage() {
           </div>
 
           {/* Admission Session */}
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-2">
             <select
               value={admissionSession}
               onChange={(e) => setAdmissionSession(e.target.value)}
               className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-slate-200 text-xs sm:text-sm focus:outline-none focus:border-teal-500 font-medium"
             >
-              <option value="All">All Admission Sessions</option>
+              <option value="All">All Sessions</option>
               <option value="Annual I">Annual I</option>
               <option value="Annual II">Annual II</option>
             </select>
@@ -192,12 +206,19 @@ export function StudentsPage() {
                   {/* Top: Name, Status, Delete */}
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <Link
-                        to={`/students/${student.id}`}
-                        className="font-bold text-white hover:text-teal-400 text-sm transition-colors block"
-                      >
-                        {student.student_name}
-                      </Link>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Link
+                          to={`/students/${student.id}`}
+                          className="font-bold text-white hover:text-teal-400 text-sm transition-colors block"
+                        >
+                          {student.student_name}
+                        </Link>
+                        {student.admission_source === 'Referral' && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-950 text-purple-300 border border-purple-500/30">
+                            🤝 Referral
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[11px] text-slate-400 block">S/O {student.father_name}</span>
                       {student.contact_number && (
                         <span className="text-[10px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
@@ -341,12 +362,19 @@ export function StudentsPage() {
                   {students.map((student) => (
                     <tr key={student.id} className="hover:bg-slate-800/40 transition-colors group">
                       <td className="py-3.5 px-4">
-                        <Link
-                          to={`/students/${student.id}`}
-                          className="font-bold text-white hover:text-teal-400 text-sm transition-colors block"
-                        >
-                          {student.student_name}
-                        </Link>
+                        <div className="flex items-center gap-2">
+                          <Link
+                            to={`/students/${student.id}`}
+                            className="font-bold text-white hover:text-teal-400 text-sm transition-colors"
+                          >
+                            {student.student_name}
+                          </Link>
+                          {student.admission_source === 'Referral' && (
+                            <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-purple-950 text-purple-300 border border-purple-500/30">
+                              🤝 Referral
+                            </span>
+                          )}
+                        </div>
                         <span className="text-[11px] text-slate-400 block">Father: {student.father_name}</span>
                         {student.contact_number && (
                           <span className="text-[10px] text-slate-500 font-mono block">{student.contact_number}</span>

@@ -33,7 +33,7 @@ export async function checkDuplicateStudentCnic(cnic, excludeStudentId = null) {
 /**
  * Fetch all students with their payments
  */
-export async function getStudents({ search = '', admissionType = '', admissionSession = '', programGroup = '', feeStatus = '' } = {}) {
+export async function getStudents({ search = '', admissionType = '', admissionSession = '', programGroup = '', feeStatus = '', admissionSource = '' } = {}) {
   try {
     let query = supabase
       .from('students')
@@ -57,6 +57,10 @@ export async function getStudents({ search = '', admissionType = '', admissionSe
 
     if (programGroup && programGroup !== 'All') {
       query = query.eq('program_group', programGroup);
+    }
+
+    if (admissionSource && admissionSource !== 'All') {
+      query = query.eq('admission_source', admissionSource);
     }
 
     const { data, error } = await query;
@@ -190,6 +194,12 @@ export async function createStudent(studentData, initialPayment = null) {
     const initialDues = Math.max(0, totalFee - (Number(initialPayment?.amount) || 0));
     const hasInitialCommitment = initialDues > 0 && (studentData.next_payment_due_date || studentData.commitment_notes);
 
+    const admissionSource = studentData.admission_source || 'Direct';
+    const brokerId = admissionSource === 'Referral' ? (studentData.broker_id || null) : null;
+    const brokerAgreedAmount = admissionSource === 'Referral' && studentData.broker_agreed_amount !== undefined && studentData.broker_agreed_amount !== null && studentData.broker_agreed_amount !== ''
+      ? Number(studentData.broker_agreed_amount)
+      : null;
+
     const { data: student, error: studentError } = await supabase
       .from('students')
       .insert([{
@@ -201,6 +211,9 @@ export async function createStudent(studentData, initialPayment = null) {
         gender: gender || 'Male',
         contact_number: studentData.contact_number || null,
         reference: studentData.reference || null,
+        admission_source: admissionSource,
+        broker_id: brokerId,
+        broker_agreed_amount: brokerAgreedAmount,
         admission_session: admissionSession,
         admission_type: admissionType,
         program_group: programGroup,
@@ -290,27 +303,42 @@ export async function updateStudent(id, studentData) {
       }
     }
 
+    const updatePayload = {
+      student_name: studentData.student_name?.trim(),
+      father_name: studentData.father_name?.trim(),
+      date_of_birth: studentData.date_of_birth || null,
+      student_cnic: formattedCnic,
+      father_cnic: studentData.father_cnic ? formatCNIC(studentData.father_cnic) : null,
+      gender: studentData.gender,
+      contact_number: studentData.contact_number || null,
+      reference: studentData.reference || null,
+      admission_session: studentData.admission_session,
+      admission_type: studentData.admission_type,
+      program_group: studentData.program_group,
+      academic_class: studentData.academic_class,
+      total_fee: Number(studentData.total_fee) || 0,
+      next_payment_due_date: studentData.next_payment_due_date || null,
+      commitment_notes: studentData.commitment_notes !== undefined ? studentData.commitment_notes : undefined,
+      commitment_status: studentData.commitment_status !== undefined ? studentData.commitment_status : undefined,
+      updated_at: new Date().toISOString()
+    };
+
+    if (studentData.admission_source !== undefined) {
+      updatePayload.admission_source = studentData.admission_source;
+      if (studentData.admission_source === 'Referral') {
+        updatePayload.broker_id = studentData.broker_id || null;
+        updatePayload.broker_agreed_amount = studentData.broker_agreed_amount !== undefined && studentData.broker_agreed_amount !== null && studentData.broker_agreed_amount !== ''
+          ? Number(studentData.broker_agreed_amount)
+          : null;
+      } else if (studentData.admission_source === 'Direct') {
+        updatePayload.broker_id = null;
+        updatePayload.broker_agreed_amount = null;
+      }
+    }
+
     const { data, error } = await supabase
       .from('students')
-      .update({
-        student_name: studentData.student_name?.trim(),
-        father_name: studentData.father_name?.trim(),
-        date_of_birth: studentData.date_of_birth || null,
-        student_cnic: formattedCnic,
-        father_cnic: studentData.father_cnic ? formatCNIC(studentData.father_cnic) : null,
-        gender: studentData.gender,
-        contact_number: studentData.contact_number || null,
-        reference: studentData.reference || null,
-        admission_session: studentData.admission_session,
-        admission_type: studentData.admission_type,
-        program_group: studentData.program_group,
-        academic_class: studentData.academic_class,
-        total_fee: Number(studentData.total_fee) || 0,
-        next_payment_due_date: studentData.next_payment_due_date || null,
-        commitment_notes: studentData.commitment_notes !== undefined ? studentData.commitment_notes : undefined,
-        commitment_status: studentData.commitment_status !== undefined ? studentData.commitment_status : undefined,
-        updated_at: new Date().toISOString()
-      })
+      .update(updatePayload)
       .eq('id', id)
       .select()
       .single();

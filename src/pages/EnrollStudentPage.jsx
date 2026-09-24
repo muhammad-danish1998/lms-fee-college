@@ -1,19 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { UserPlus, User, BookOpen, DollarSign, Calendar, AlertCircle, CheckCircle2, ArrowLeft, CreditCard, ShieldAlert, Clock, Award } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { UserPlus, User, BookOpen, DollarSign, Calendar, AlertCircle, CheckCircle2, ArrowLeft, CreditCard, ShieldAlert, Clock, Award, Users, Handshake, Info } from 'lucide-react';
 import { createStudent, checkDuplicateStudentCnic } from '../services/studentService';
 import { getAdmissionConfig } from '../services/configService';
+import { getActiveBrokers } from '../services/brokerService';
 import { calculateDues, formatCurrency } from '../utils/feeCalculator';
 import { formatCNIC, isValidCNIC } from '../utils/cnicHelper';
 
 export function EnrollStudentPage() {
   const navigate = useNavigate();
   const [config, setConfig] = useState(null);
+  const [brokers, setBrokers] = useState([]);
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [cnicChecking, setCnicChecking] = useState(false);
   const [cnicDuplicateError, setCnicDuplicateError] = useState('');
+
+  // Admission Source: 'Direct' | 'Referral'
+  const [admissionSource, setAdmissionSource] = useState('Direct');
+  const [selectedBrokerId, setSelectedBrokerId] = useState('');
+  const [brokerAgreedAmount, setBrokerAgreedAmount] = useState('');
 
   // Commitment mode state when dues > 0
   const [commitmentType, setCommitmentType] = useState('stage'); // 'stage' | 'date' | 'both'
@@ -40,30 +47,55 @@ export function EnrollStudentPage() {
     next_payment_due_date: ''
   });
 
-  // Load admission configuration
+  // Load admission configuration and active brokers
   useEffect(() => {
-    async function loadConfig() {
+    async function loadData() {
       try {
         setLoadingConfig(true);
-        const data = await getAdmissionConfig();
-        setConfig(data);
+        const [configData, brokersData] = await Promise.all([
+          getAdmissionConfig(),
+          getActiveBrokers()
+        ]);
+        setConfig(configData);
+        setBrokers(brokersData || []);
+
+        if (brokersData && brokersData.length > 0) {
+          setSelectedBrokerId(brokersData[0].id);
+          setBrokerAgreedAmount(String(brokersData[0].current_agreed_amount || ''));
+        }
 
         // Set initial default selections based on 'Regular'
-        const regularPrograms = data.programGroups['Regular'] || [];
-        const regularClasses = data.academicClasses['Regular'] || [];
+        const regularPrograms = configData.programGroups['Regular'] || [];
+        const regularClasses = configData.academicClasses['Regular'] || [];
         setFormData(prev => ({
           ...prev,
           program_group: regularPrograms[0] || '',
           academic_class: regularClasses[0] || ''
         }));
       } catch (err) {
-        console.error('Failed to load admission config:', err);
+        console.error('Failed to load admission config or brokers:', err);
       } finally {
         setLoadingConfig(false);
       }
     }
-    loadConfig();
+    loadData();
   }, []);
+
+  const handleBrokerChange = (brokerId) => {
+    setSelectedBrokerId(brokerId);
+    const found = brokers.find(b => b.id === brokerId);
+    if (found) {
+      setBrokerAgreedAmount(String(found.current_agreed_amount || ''));
+    }
+  };
+
+  const handleAdmissionSourceToggle = (source) => {
+    setAdmissionSource(source);
+    if (source === 'Referral' && (!selectedBrokerId || selectedBrokerId === '') && brokers.length > 0) {
+      setSelectedBrokerId(brokers[0].id);
+      setBrokerAgreedAmount(String(brokers[0].current_agreed_amount || ''));
+    }
+  };
 
   // Handle dependent dropdown updates when admission type changes
   const handleAdmissionTypeChange = (newType) => {
@@ -207,6 +239,14 @@ export function EnrollStudentPage() {
         }
       }
 
+      // Referral validation
+      if (admissionSource === 'Referral') {
+        if (!selectedBrokerId) {
+          setFormError('Please select a Referral Broker / Partner.');
+          return;
+        }
+      }
+
       const student = await createStudent(
         {
           student_name: trimmedName,
@@ -217,6 +257,9 @@ export function EnrollStudentPage() {
           gender: gender,
           contact_number: formData.contact_number.trim() || null,
           reference: formData.reference.trim() || null,
+          admission_source: admissionSource,
+          broker_id: admissionSource === 'Referral' ? selectedBrokerId : null,
+          broker_agreed_amount: admissionSource === 'Referral' ? (Number(brokerAgreedAmount) || 0) : null,
           admission_session: session,
           admission_type: type,
           program_group: program,
@@ -262,7 +305,7 @@ export function EnrollStudentPage() {
           </button>
           <h2 className="text-2xl font-extrabold text-white tracking-tight">Student Enrollment</h2>
           <p className="text-xs md:text-sm text-slate-400">
-            Fill in student bio, admission stream, class allocation, and fee structure
+            Fill in admission source, student bio, academic stream, and fee structure
           </p>
         </div>
       </div>
@@ -278,6 +321,146 @@ export function EnrollStudentPage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Section 0: Admission Source (Direct vs Referral) */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <div className="flex items-center gap-2 text-teal-400 font-bold text-sm uppercase tracking-wider">
+              <Handshake className="w-4 h-4" />
+              <span>Admission Source</span>
+            </div>
+            <span className="text-[11px] text-slate-400">Select student enrollment channel</span>
+          </div>
+
+          {/* Toggle Buttons */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => handleAdmissionSourceToggle('Direct')}
+              className={`p-4 rounded-xl border text-left transition-all flex items-start gap-3.5 ${
+                admissionSource === 'Direct'
+                  ? 'bg-teal-950/50 border-teal-500/60 ring-1 ring-teal-500/40 text-white shadow-sm'
+                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+              }`}
+            >
+              <div className={`p-2.5 rounded-lg shrink-0 ${
+                admissionSource === 'Direct' ? 'bg-teal-500/20 text-teal-300' : 'bg-slate-800 text-slate-400'
+              }`}>
+                <User className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="font-bold text-sm text-slate-100 flex items-center gap-2">
+                  <span>Direct Student</span>
+                  {admissionSource === 'Direct' && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/40">
+                      Standard
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Enrolled directly with the college. No broker or external referral involved.
+                </p>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleAdmissionSourceToggle('Referral')}
+              className={`p-4 rounded-xl border text-left transition-all flex items-start gap-3.5 ${
+                admissionSource === 'Referral'
+                  ? 'bg-teal-950/50 border-teal-500/60 ring-1 ring-teal-500/40 text-white shadow-sm'
+                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+              }`}
+            >
+              <div className={`p-2.5 rounded-lg shrink-0 ${
+                admissionSource === 'Referral' ? 'bg-teal-500/20 text-teal-300' : 'bg-slate-800 text-slate-400'
+              }`}>
+                <Handshake className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="font-bold text-sm text-slate-100 flex items-center gap-2">
+                  <span>Referral / Broker Student</span>
+                  {admissionSource === 'Referral' && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/40">
+                      Partner
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Referred by a broker/partner. Record institutional agreed snapshot amount.
+                </p>
+              </div>
+            </button>
+          </div>
+
+          {/* Referral Broker Details Box (Conditional) */}
+          {admissionSource === 'Referral' && (
+            <div className="p-4 rounded-xl bg-slate-950/90 border border-teal-500/30 space-y-3.5 mt-3 animate-fadeIn">
+              <div className="flex items-center gap-2 text-xs font-bold text-teal-300 uppercase tracking-wide">
+                <Users className="w-3.5 h-3.5 text-teal-400" />
+                <span>Broker / Partner Allocation</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Select Broker */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    Select Referring Broker <span className="text-rose-400">*</span>
+                  </label>
+                  <select
+                    required={admissionSource === 'Referral'}
+                    value={selectedBrokerId}
+                    onChange={(e) => handleBrokerChange(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-teal-500 font-semibold"
+                  >
+                    {brokers.length === 0 && (
+                      <option value="">No brokers registered yet</option>
+                    )}
+                    {brokers.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} {b.current_agreed_amount ? `(Standard: Rs. ${Number(b.current_agreed_amount).toLocaleString()})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {brokers.length === 0 ? (
+                    <span className="text-[11px] text-amber-400 mt-1 block">
+                      ⚠️ No brokers found.{' '}
+                      <Link to="/config" className="underline font-bold text-teal-300 hover:text-teal-200">
+                        Click here to add your actual brokers
+                      </Link>
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-slate-400 mt-1 block">
+                      Select the partner who referred this student
+                    </span>
+                  )}
+                </div>
+
+                {/* Historical Snapshot Agreed Amount */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    Agreed Broker Amount (PKR) <span className="text-rose-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      required={admissionSource === 'Referral'}
+                      placeholder="e.g. 3000"
+                      value={brokerAgreedAmount}
+                      onChange={(e) => setBrokerAgreedAmount(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-teal-500/50 text-teal-300 font-mono text-base font-bold focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400"
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                    <Info className="w-3 h-3 text-teal-400 shrink-0 inline" />
+                    <span>Locked snapshot for this student; immune to future broker rate changes.</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Section 1: Student Information */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm">
           <div className="flex items-center gap-2 text-teal-400 font-bold text-sm uppercase tracking-wider mb-5 pb-3 border-b border-slate-800">

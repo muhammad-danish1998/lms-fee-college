@@ -6,7 +6,7 @@ const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/students', label: 'Students Directory', icon: Users },
   { to: '/enroll', label: 'Enroll Student', icon: UserPlus },
-  { to: '/config', label: 'Academic Streams', icon: Sliders },
+  { to: '/config', label: 'Academic & Brokers', icon: Sliders },
 ];
 
 export function Sidebar({ mobileMenuOpen, onCloseMobileMenu }) {

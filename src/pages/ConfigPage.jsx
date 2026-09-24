@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Sliders, Plus, Trash2, BookOpen, Layers, ShieldCheck, AlertCircle, CheckCircle2, KeyRound } from 'lucide-react';
+import { Sliders, Plus, Trash2, BookOpen, Layers, ShieldCheck, AlertCircle, CheckCircle2, KeyRound, Handshake } from 'lucide-react';
 import { getRawAdminConfig, addProgramGroup, deleteProgramGroup, addAcademicClass, deleteAcademicClass } from '../services/configService';
 import { useAuth } from '../context/AuthContext';
 import { UpdateCredentialsModal } from '../components/auth/UpdateCredentialsModal';
+import { BrokerManagementTab } from '../components/brokers/BrokerManagementTab';
 
 export function ConfigPage() {
   const { user } = useAuth();
+  const [activeMainTab, setActiveMainTab] = useState('academic'); // 'academic' | 'brokers'
   const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -155,26 +157,58 @@ export function ConfigPage() {
         </button>
       </div>
 
-      {/* Stream Tabs */}
+      {/* Main Navigation Tabs */}
       <div className="flex gap-2 p-1.5 rounded-2xl bg-slate-900 border border-slate-800">
-        {[
-          { code: 'REGULAR', label: 'Regular Admissions' },
-          { code: 'PRIVATE', label: 'Private Admissions' },
-          { code: 'COMBINE', label: 'Combine (Gap) Admissions' }
-        ].map(tab => (
-          <button
-            key={tab.code}
-            onClick={() => setSelectedType(tab.code)}
-            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
-              selectedType === tab.code
-                ? 'bg-teal-600 text-white shadow-md shadow-teal-600/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+        <button
+          onClick={() => setActiveMainTab('academic')}
+          className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+            activeMainTab === 'academic'
+              ? 'bg-teal-600 text-white shadow-md shadow-teal-600/30'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+          }`}
+        >
+          <Sliders className="w-4 h-4" />
+          <span>Academic Streams &amp; Classes</span>
+        </button>
+
+        <button
+          onClick={() => setActiveMainTab('brokers')}
+          className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+            activeMainTab === 'brokers'
+              ? 'bg-teal-600 text-white shadow-md shadow-teal-600/30'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+          }`}
+        >
+          <Handshake className="w-4 h-4" />
+          <span>Referral Brokers &amp; Ledger</span>
+        </button>
       </div>
+
+      {/* Main Tab Content */}
+      {activeMainTab === 'brokers' ? (
+        <BrokerManagementTab />
+      ) : (
+        <>
+          {/* Stream Tabs */}
+          <div className="flex gap-2 p-1.5 rounded-2xl bg-slate-900 border border-slate-800">
+            {[
+              { code: 'REGULAR', label: 'Regular Admissions' },
+              { code: 'PRIVATE', label: 'Private Admissions' },
+              { code: 'COMBINE', label: 'Combine (Gap) Admissions' }
+            ].map(tab => (
+              <button
+                key={tab.code}
+                onClick={() => setSelectedType(tab.code)}
+                className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all ${
+                  selectedType === tab.code
+                    ? 'bg-slate-800 text-teal-300 border border-slate-700 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
       {loading ? (
         <div className="p-12 text-center text-slate-400 text-sm">
@@ -274,6 +308,8 @@ export function ConfigPage() {
           </div>
         </div>
       )}
+    </>
+  )}
 
       {/* Update Credentials Modal */}
       {showCredentialsModal && (
