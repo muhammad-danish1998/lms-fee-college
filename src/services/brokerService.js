@@ -46,14 +46,28 @@ export async function getActiveBrokers() {
 }
 
 /**
+ * Generate a cryptographically strong pseudo-random token for broker portal access
+ */
+export function generateBrokerToken() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let token = 'brk_';
+  for (let i = 0; i < 28; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return token;
+}
+
+/**
  * Add a new broker
  */
-export async function createBroker({ name, phone = '', currentAgreedAmount = 0, notes = '' }) {
+export async function createBroker({ name, phone = '', currentAgreedAmount = 0, notes = '', securityPin = '1234' }) {
   try {
     const trimmedName = (name || '').trim();
     if (!trimmedName) throw new Error('Broker Name is required.');
 
     const amount = Number(currentAgreedAmount) >= 0 ? Number(currentAgreedAmount) : 0;
+    const token = generateBrokerToken();
+    const pin = (securityPin || '1234').trim().slice(0, 8);
 
     const { data, error } = await supabase
       .from('brokers')
@@ -62,6 +76,9 @@ export async function createBroker({ name, phone = '', currentAgreedAmount = 0, 
         phone: phone ? phone.trim() : null,
         current_agreed_amount: amount,
         is_active: true,
+        access_token: token,
+        security_pin: pin,
+        is_portal_active: true,
         notes: notes ? notes.trim() : null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -78,8 +95,7 @@ export async function createBroker({ name, phone = '', currentAgreedAmount = 0, 
 }
 
 /**
- * Update an existing broker's master info and current agreed rate
- * (Note: Updating a broker's current agreed amount does NOT modify historical student snapshot amounts)
+ * Update an existing broker's master info, PIN, or active states
  */
 export async function updateBroker(id, updates) {
   try {
@@ -93,6 +109,9 @@ export async function updateBroker(id, updates) {
       payload.current_agreed_amount = Number(updates.current_agreed_amount) || 0;
     }
     if (updates.is_active !== undefined) payload.is_active = Boolean(updates.is_active);
+    if (updates.is_portal_active !== undefined) payload.is_portal_active = Boolean(updates.is_portal_active);
+    if (updates.security_pin !== undefined) payload.security_pin = String(updates.security_pin).trim();
+    if (updates.access_token !== undefined) payload.access_token = updates.access_token;
     if (updates.notes !== undefined) payload.notes = updates.notes ? updates.notes.trim() : null;
 
     const { data, error } = await supabase
@@ -129,6 +148,130 @@ export async function deleteBroker(id) {
 }
 
 /**
+ * Toggle broker portal active / inactive status
+ */
+export async function toggleBrokerPortalStatus(brokerId, isPortalActive) {
+  return updateBroker(brokerId, { is_portal_active: Boolean(isPortalActive) });
+}
+
+/**
+ * Regenerate access token for a broker (revokes previously shared links)
+ */
+export async function regenerateBrokerAccessToken(brokerId) {
+  const newToken = generateBrokerToken();
+  return updateBroker(brokerId, { access_token: newToken });
+}
+
+/**
+ * Update broker 4-digit security PIN
+ */
+export async function updateBrokerSecurityPin(brokerId, newPin) {
+  const pin = String(newPin || '1234').trim();
+  return updateBroker(brokerId, { security_pin: pin });
+}
+
+/**
+ * Fetch public broker portal info and students for a verified token
+ */
+export async function getBrokerPortalDataByToken(token) {
+  try {
+    if (!token) throw new Error('Portal link token is missing.');
+
+    // 1. Fetch broker by access_token
+    const { data: broker, error: brokerErr } = await supabase
+      .from('brokers')
+      .select('id, name, phone, is_active, is_portal_active, security_pin, current_agreed_amount')
+      .eq('access_token', token)
+      .single();
+
+    if (brokerErr || !broker) {
+      throw new Error('Invalid or expired broker portal link.');
+    }
+
+    if (!broker.is_portal_active || !broker.is_active) {
+      return {
+        isLinkActive: false,
+        brokerName: broker.name,
+        error: 'This portal link has been deactivated by college administration.'
+      };
+    }
+
+    // 2. Fetch all students referred by this broker strictly
+    const { data: students, error: studentErr } = await supabase
+      .from('students')
+      .select(`
+        id,
+        student_name,
+        father_name,
+        admission_session,
+        admission_type,
+        program_group,
+        academic_class,
+        total_fee,
+        broker_agreed_amount,
+        created_at,
+        enrollment_verification,
+        enrollment_card_issued,
+        examination_verification,
+        admit_card_issued,
+        payments (amount, payment_date)
+      `)
+      .eq('broker_id', broker.id)
+      .order('created_at', { ascending: false });
+
+    if (studentErr) throw studentErr;
+
+    // 3. Calculate financial totals per student
+    const processedStudents = (students || []).map(s => {
+      const totalPaid = (s.payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+      const studentTotalFee = Number(s.total_fee) || 0;
+      const dues = Math.max(0, studentTotalFee - totalPaid);
+      const agreedSnapshot = Number(s.broker_agreed_amount) || 0;
+
+      // Progress determination
+      let currentProgress = 'Enrollment in Verification';
+      let stepNumber = 1;
+      if (s.admit_card_issued) {
+        currentProgress = 'Admit Card Issued';
+        stepNumber = 4;
+      } else if (s.examination_verification) {
+        currentProgress = 'Examination in Verification';
+        stepNumber = 3;
+      } else if (s.enrollment_card_issued) {
+        currentProgress = 'Enrollment Card Issued';
+        stepNumber = 2;
+      } else if (s.enrollment_verification) {
+        currentProgress = 'Enrollment in Verification';
+        stepNumber = 1;
+      }
+
+      return {
+        ...s,
+        total_paid: totalPaid,
+        dues: dues,
+        agreed_snapshot: agreedSnapshot,
+        current_progress: currentProgress,
+        step_number: stepNumber
+      };
+    });
+
+    return {
+      isLinkActive: true,
+      broker: {
+        id: broker.id,
+        name: broker.name,
+        phone: broker.phone,
+        security_pin: broker.security_pin
+      },
+      students: processedStudents
+    };
+  } catch (err) {
+    console.error('getBrokerPortalDataByToken error:', err);
+    throw err;
+  }
+}
+
+/**
  * Fetch broker ledger & accounting summary.
  * Calculates total students and total institutional balance strictly using
  * the HISTORICAL SNAPSHOT agreed amount on each student's enrollment record.
@@ -149,6 +292,11 @@ export async function getBrokerAccountingSummary() {
 
     // Aggregate summary per broker
     const brokerSummaries = brokers.map((broker) => {
+      // If broker doesn't have an access_token yet, generate one virtually or on the fly
+      const token = broker.access_token || `brk_${broker.id.replace(/-/g, '').slice(0, 16)}`;
+      const isPortalActive = broker.is_portal_active !== undefined ? broker.is_portal_active : true;
+      const securityPin = broker.security_pin || '1234';
+
       // Find all students enrolled under this broker
       const studentsForBroker = referralStudents.filter(s => s.broker_id === broker.id);
 
@@ -160,6 +308,9 @@ export async function getBrokerAccountingSummary() {
 
       return {
         ...broker,
+        access_token: token,
+        is_portal_active: isPortalActive,
+        security_pin: securityPin,
         total_students_count: studentsForBroker.length,
         total_snapshot_amount: totalAgreedAmount,
         students: studentsForBroker
@@ -172,3 +323,4 @@ export async function getBrokerAccountingSummary() {
     throw err;
   }
 }
+

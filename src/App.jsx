@@ -9,14 +9,17 @@ import { StudentsPage } from './pages/StudentsPage';
 import { EnrollStudentPage } from './pages/EnrollStudentPage';
 import { StudentProfilePage } from './pages/StudentProfilePage';
 import { ConfigPage } from './pages/ConfigPage';
+import { BrokerPortalPage } from './pages/BrokerPortalPage';
 
 export function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* Public Login Route */}
+          {/* Public Routes */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/broker-portal/:token" element={<BrokerPortalPage />} />
+          <Route path="/portal/broker/:token" element={<BrokerPortalPage />} />
 
           {/* Protected Routes */}
           <Route
