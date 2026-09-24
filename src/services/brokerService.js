@@ -171,64 +171,40 @@ export async function updateBrokerSecurityPin(brokerId, newPin) {
 }
 
 /**
- * Fetch public broker portal info and students for a verified token
+ * Fetch public broker portal info and students securely via server-side database RPC function
+ * Verifies token, active status, and PIN inside PostgreSQL; zero student data is transmitted if PIN is wrong.
  */
-export async function getBrokerPortalDataByToken(token) {
+export async function getBrokerPortalDataByRpc(token, pin) {
   try {
     if (!token) throw new Error('Portal link token is missing.');
+    if (!pin) throw new Error('Please enter your 4-digit security PIN.');
 
-    // 1. Fetch broker by access_token
-    const { data: broker, error: brokerErr } = await supabase
-      .from('brokers')
-      .select('id, name, phone, is_active, is_portal_active, security_pin, current_agreed_amount')
-      .eq('access_token', token)
-      .single();
+    const cleanPin = String(pin).trim();
 
-    if (brokerErr || !broker) {
-      throw new Error('Invalid or expired broker portal link.');
+    const { data, error } = await supabase.rpc('get_broker_portal_records', {
+      p_token: token,
+      p_pin: cleanPin
+    });
+
+    if (error) {
+      throw new Error(error.message || 'Invalid access token, incorrect PIN, or portal link has been deactivated.');
     }
 
-    if (!broker.is_portal_active || !broker.is_active) {
+    if (!data || !data.isLinkActive) {
       return {
         isLinkActive: false,
-        brokerName: broker.name,
+        brokerName: data?.broker?.name || 'Partner',
         error: 'This portal link has been deactivated by college administration.'
       };
     }
 
-    // 2. Fetch all students referred by this broker strictly
-    const { data: students, error: studentErr } = await supabase
-      .from('students')
-      .select(`
-        id,
-        student_name,
-        father_name,
-        admission_session,
-        admission_type,
-        program_group,
-        academic_class,
-        total_fee,
-        broker_agreed_amount,
-        created_at,
-        enrollment_verification,
-        enrollment_card_issued,
-        examination_verification,
-        admit_card_issued,
-        payments (amount, payment_date)
-      `)
-      .eq('broker_id', broker.id)
-      .order('created_at', { ascending: false });
-
-    if (studentErr) throw studentErr;
-
-    // 3. Calculate financial totals per student
-    const processedStudents = (students || []).map(s => {
+    // Process students with calculated financial dues and progress badges
+    const processedStudents = (data.students || []).map(s => {
       const totalPaid = (s.payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
       const studentTotalFee = Number(s.total_fee) || 0;
       const dues = Math.max(0, studentTotalFee - totalPaid);
       const agreedSnapshot = Number(s.broker_agreed_amount) || 0;
 
-      // Progress determination
       let currentProgress = 'Enrollment in Verification';
       let stepNumber = 1;
       if (s.admit_card_issued) {
@@ -257,16 +233,11 @@ export async function getBrokerPortalDataByToken(token) {
 
     return {
       isLinkActive: true,
-      broker: {
-        id: broker.id,
-        name: broker.name,
-        phone: broker.phone,
-        security_pin: broker.security_pin
-      },
+      broker: data.broker,
       students: processedStudents
     };
   } catch (err) {
-    console.error('getBrokerPortalDataByToken error:', err);
+    console.error('getBrokerPortalDataByRpc error:', err);
     throw err;
   }
 }

@@ -5,13 +5,14 @@ import {
   Calendar, Search, Filter, Printer, DollarSign, Users, Award, FileText,
   Clock, Phone, RefreshCw, XCircle
 } from 'lucide-react';
-import { getBrokerPortalDataByToken } from '../services/brokerService';
+import { getBrokerPortalDataByRpc } from '../services/brokerService';
 import { formatCurrency, formatDate } from '../utils/feeCalculator';
 
 export function BrokerPortalPage() {
   const { token } = useParams();
 
   const [loading, setLoading] = useState(true);
+  const [isVerifying, setIsVerifying] = useState(false);
   const [portalError, setPortalError] = useState('');
   const [portalData, setPortalData] = useState(null);
 
@@ -25,60 +26,55 @@ export function BrokerPortalPage() {
   const [sessionFilter, setSessionFilter] = useState('All');
   const [progressFilter, setProgressFilter] = useState('All');
 
-  const loadData = async () => {
+  useEffect(() => {
+    // Check if previously unlocked in this session
+    const savedPin = sessionStorage.getItem(`broker_pin_${token}`);
+    if (savedPin) {
+      handleUnlockWithPin(savedPin);
+    } else {
+      setLoading(false);
+    }
+  }, [token]);
+
+  const handleUnlockWithPin = async (pin) => {
     try {
-      setLoading(true);
-      setPortalError('');
-      const data = await getBrokerPortalDataByToken(token);
+      setIsVerifying(true);
+      setPinError('');
+      const data = await getBrokerPortalDataByRpc(token, pin);
 
       if (!data || !data.isLinkActive) {
         setPortalError(data?.error || 'This portal link has been deactivated by college administration.');
         setPortalData(null);
+        setIsUnlocked(false);
       } else {
         setPortalData(data);
-        // Check if already authenticated in this browser tab session
-        const sessionAuth = sessionStorage.getItem(`broker_auth_${token}`);
-        if (sessionAuth === 'true') {
-          setIsUnlocked(true);
-        }
+        setIsUnlocked(true);
+        sessionStorage.setItem(`broker_pin_${token}`, pin);
       }
     } catch (err) {
-      console.error('Portal load error:', err);
-      setPortalError('Invalid or expired broker portal link. Please check your link or contact the admissions office.');
+      console.error('Portal unlock error:', err);
+      setPinError(err.message || 'Incorrect PIN or portal link is inactive.');
+      setIsUnlocked(false);
     } finally {
+      setIsVerifying(false);
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (token) {
-      loadData();
-    }
-  }, [token]);
-
-  const handleVerifyPin = (e) => {
+  const handleVerifyPin = async (e) => {
     e.preventDefault();
-    setPinError('');
-
     if (!pinInput.trim()) {
       setPinError('Please enter your 4-digit security PIN.');
       return;
     }
-
-    const expectedPin = String(portalData?.broker?.security_pin || '1234').trim();
-    if (pinInput.trim() !== expectedPin) {
-      setPinError('Incorrect PIN. Please contact the college administration if you forgot your PIN.');
-      return;
-    }
-
-    setIsUnlocked(true);
-    sessionStorage.setItem(`broker_auth_${token}`, 'true');
+    await handleUnlockWithPin(pinInput.trim());
   };
 
   const handleLockSession = () => {
     setIsUnlocked(false);
     setPinInput('');
-    sessionStorage.removeItem(`broker_auth_${token}`);
+    setPortalData(null);
+    sessionStorage.removeItem(`broker_pin_${token}`);
   };
 
   const handlePrint = () => {
@@ -160,7 +156,9 @@ export function BrokerPortalPage() {
             <div className="inline-block px-3 py-1 rounded-full bg-purple-900/40 text-purple-300 text-[11px] font-bold border border-purple-500/30">
               Verified Partner Portal
             </div>
-            <h2 className="text-xl font-black text-white tracking-tight">{portalData.broker.name}</h2>
+            <h2 className="text-xl font-black text-white tracking-tight">
+              {portalData?.broker?.name || 'Referral Partner Portal'}
+            </h2>
             <p className="text-xs text-slate-400">
               Enter your 4-digit security PIN to access your student records &amp; statements.
             </p>
@@ -184,19 +182,21 @@ export function BrokerPortalPage() {
                 maxLength="8"
                 autoFocus
                 required
+                disabled={isVerifying}
                 placeholder="••••"
                 value={pinInput}
                 onChange={(e) => setPinInput(e.target.value)}
-                className="w-full px-4 py-3 rounded-2xl bg-slate-950 border border-purple-500/40 text-purple-200 text-center font-mono text-2xl tracking-[0.5em] focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20"
+                className="w-full px-4 py-3 rounded-2xl bg-slate-950 border border-purple-500/40 text-purple-200 text-center font-mono text-2xl tracking-[0.5em] focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20 disabled:opacity-50"
               />
             </div>
 
             <button
               type="submit"
-              className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm shadow-lg shadow-purple-600/25 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+              disabled={isVerifying}
+              className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm shadow-lg shadow-purple-600/25 transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-60"
             >
               <Unlock className="w-4 h-4" />
-              <span>Unlock Partner Dashboard</span>
+              <span>{isVerifying ? 'Verifying PIN...' : 'Unlock Partner Dashboard'}</span>
             </button>
           </form>
 
