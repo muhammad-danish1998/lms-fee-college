@@ -122,8 +122,8 @@ export function BrokerPortalPage() {
     );
   }
 
-  // --- Deactivated / Invalid Link Error State ---
-  if (portalError || !portalData) {
+  // --- Deactivated / Permanent Error State ---
+  if (portalError) {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4">
         <div className="max-w-md w-full p-8 rounded-3xl bg-slate-900 border border-slate-800 text-center shadow-2xl space-y-5">
@@ -133,7 +133,7 @@ export function BrokerPortalPage() {
           <div>
             <h2 className="text-xl font-bold text-white">Portal Access Unavailable</h2>
             <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-              {portalError || 'This referral partner portal is either inactive, expired, or deactivated by the college administration.'}
+              {portalError}
             </p>
           </div>
           <div className="pt-2 border-t border-slate-800 text-[11px] text-slate-500">
@@ -145,7 +145,7 @@ export function BrokerPortalPage() {
   }
 
   // --- PIN Protection Lock Screen ---
-  if (!isUnlocked) {
+  if (!isUnlocked || !portalData) {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4">
         <div className="max-w-md w-full p-8 rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl space-y-6">
